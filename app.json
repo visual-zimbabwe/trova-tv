@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Trova TV",
+    "slug": "trova-tv",
+    "version": "2.0.0",
+    "scheme": "trova",
+    "orientation": "landscape",
+    "icon": "./icon.png",
+    "platforms": ["android"],
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#040301"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "icon": "./icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./icon-light.png",
+        "backgroundColor": "#040301"
+      },
+      "package": "kkadogo.findstreamer.com",
+      "usesCleartextTraffic": false,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-splash-screen",
+      "expo-system-ui",
+      "expo-asset",
+      "expo-sharing",
+      "expo-image"
+    ],
+    "Owner": "juwimana"
+  }
+}
