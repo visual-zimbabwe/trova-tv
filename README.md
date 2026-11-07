@@ -9,6 +9,24 @@
 
 Trova TV is a cinema and streaming discovery application designed for 10-foot living-room displays, Android TV, and Google TV. Re-architected to the visual and ergonomic standards of premier television streaming platforms (Netflix, HBO Max, BBC iPlayer, Apple TV+), Trova TV delivers a seamless cinematic experience with hardware D-pad navigation, high-resolution theatrical key-art, and transparent global streaming availability.
 
+<p align="center">
+  <img src="assets/screenshots/01-home-spotlight.png" alt="Trova TV Theatrical Home Stage" width="100%" />
+</p>
+
+---
+
+## 📸 Screen Showcase
+
+| Theatrical Hero Billboard | Where to Watch Officially |
+|:---:|:---:|
+| ![Home Spotlight Billboard](assets/screenshots/01-home-spotlight.png) | ![Where to Watch Officially](assets/screenshots/02-detail-where-to-watch.png) |
+| *Widescreen 4K backdrop, official title logo treatment & 2:3 vertical poster card* | *Country-by-country streaming provider matrix with explicit regional names* |
+
+| Synchronized Discover Matrix | Seamless Watchlist Canvas |
+|:---:|:---:|
+| ![Discover Matrix](assets/screenshots/03-discover-matrix.png) | ![Watchlist](assets/screenshots/04-watchlist.png) |
+| *Reactive faceted filtering across films, TV shows, genres & release eras* | *Cross-device synchronized watchlist on deep `#040301` cinema black* |
+
 ---
 
 ## 🌟 Living-Room Canvas & Design Philosophy
