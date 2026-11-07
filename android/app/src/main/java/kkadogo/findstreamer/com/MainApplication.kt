@@ -1,0 +1,60 @@
+package kkadogo.findstreamer.com
+
+import android.app.Application
+import android.content.res.Configuration
+
+import androidx.appcompat.app.AppCompatDelegate
+import com.facebook.react.PackageList
+import com.facebook.react.ReactApplication
+import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
+import com.facebook.react.ReactPackage
+import com.facebook.react.ReactHost
+import com.facebook.react.common.ReleaseLevel
+import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
+
+import expo.modules.ApplicationLifecycleDispatcher
+import expo.modules.ExpoReactHostFactory
+
+class MainApplication : Application(), ReactApplication {
+
+  override val reactHost: ReactHost by lazy {
+    ExpoReactHostFactory.getDefaultReactHost(
+      context = applicationContext,
+      packageList =
+        PackageList(this).packages.apply {
+          add(TorrentStreamerPackage())
+        }
+    )
+  }
+
+  override fun onCreate() {
+    super.onCreate()
+    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
+    DefaultNewArchitectureEntryPoint.releaseLevel = try {
+      ReleaseLevel.valueOf(BuildConfig.REACT_NATIVE_RELEASE_LEVEL.uppercase())
+    } catch (e: IllegalArgumentException) {
+      ReleaseLevel.STABLE
+    }
+    loadReactNative(this)
+    ApplicationLifecycleDispatcher.onApplicationCreate(this)
+
+    // Launch embedded mobile torrent streaming & download engine in persistent internal storage
+    Thread {
+      try {
+        val legacyCache = java.io.File(cacheDir, "torrent_stream")
+        if (legacyCache.exists()) {
+          legacyCache.deleteRecursively()
+        }
+        val storage = java.io.File(filesDir, "trova_media").absolutePath
+        TorrentStreamer.start(storage, 8899)
+      } catch (e: Throwable) {
+        android.util.Log.e("MainApplication", "Failed to start TorrentStreamer", e)
+      }
+    }.start()
+  }
+
+  override fun onConfigurationChanged(newConfig: Configuration) {
+    super.onConfigurationChanged(newConfig)
+    ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
+  }
+}

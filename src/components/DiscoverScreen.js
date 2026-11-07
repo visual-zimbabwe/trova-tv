@@ -1,0 +1,2925 @@
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import {
+  Animated,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  TextInput,
+  FlatList,
+  Keyboard,
+  Platform,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../theme/ThemeProvider';
+import { watchlistEntryKey } from '../lib/watchlistModel';
+import { useBottomNavScroll, useBottomNavVisibility } from '../context/BottomNavVisibilityContext';
+import { EmptyState } from './EmptyState';
+import {
+  ResultsSkeleton,
+  GenreChipSkeleton,
+  LoadMoreSkeleton,
+  PickerListSkeleton,
+  SkeletonBlock,
+} from './SkeletonLoaders';
+import { resolveLanguageLabel } from '../lib/languages';
+import { translateSortByForMediaType } from '../lib/tvAiringFilter';
+import {
+  REGION_QUICK_PICK_FILTERS,
+  VIBE_QUICK_PICK_FILTERS,
+  isSmartFilterApplicableToMediaType,
+} from '../lib/smartFilters';
+import {
+  buildPickerSections,
+  pushRecent,
+  POPULAR_LANGUAGE_CODES,
+  POPULAR_COUNTRY_CODES,
+  ITEM_HEIGHT as PICKER_ITEM_HEIGHT,
+} from '../lib/discoverPickerSections';
+import {
+  loadRecentLanguageCodes,
+  saveRecentLanguageCodes,
+  loadRecentCountryCodes,
+  saveRecentCountryCodes,
+} from '../lib/discoverRecentsStorage';
+import {
+  GENRE_STATE,
+  genreStateFor,
+  smartTagStateFor,
+  languageStateFor,
+  airingStateFor,
+  reduceTriState,
+} from '../lib/genreTriState';
+import {
+  RATING_MIN,
+  RATING_MAX,
+  RATING_STEP,
+  YEAR_MIN,
+  yearMax,
+  RUNTIME_MIN,
+  RUNTIME_MAX,
+  RUNTIME_STEP,
+  ratingLowFromFilters,
+  ratingHighFromFilters,
+  ratingFiltersFromRange,
+  yearLowFromFilters,
+  yearHighFromFilters,
+  yearFiltersFromRange,
+  runtimeLowFromFilters,
+  runtimeHighFromFilters,
+  runtimeFiltersFromRange,
+  formatRatingRange,
+  formatYearRange,
+  formatRuntimeRange,
+  formatSeasonsRange,
+  formatSeasonsCountLabel,
+  formatTvStatus,
+  RATING_DISTRIBUTION,
+  YEAR_DISTRIBUTION,
+} from '../lib/discoverRanges';
+import { RatingFilterControl } from './RatingFilterControl';
+import { YearFilterControl } from './YearFilterControl';
+import { RuntimeFilterControl } from './RuntimeFilterControl';
+import { SeasonsFilterControl } from './SeasonsFilterControl';
+import { TvStatusFilterControl } from './TvStatusFilterControl';
+import { shouldPrefetchNextPage } from '../lib/discoverPagination';
+import { scale } from '../utils/responsive';
+import { GOLD_ACCENT, GOLD_DIM, GRID_PAD, GRID_GAP, FADE_MS, GRID_COL_W } from '../theme/programme';
+import { ProgrammeSectionHeader } from './ProgrammeSectionHeader';
+import { ProgrammeHairline } from './ProgrammeHairline';
+import { GridPosterCard } from './GridPosterCard';
+import { useBottomSheet } from './StackBottomSheet';
+import { DiscoverStreamingSheet } from './DiscoverStreamingSheet';
+import { getServiceLabel, loadWhereToWatchPrefs, saveWhereToWatchPrefs } from '../lib/whereToWatch';
+
+// ─── Sort Options (media-type-aware) ──────────────────────────────────────────
+const SORT_OPTIONS_MOVIE = [
+  { value: 'popularity.desc', label: 'Most Popular' },
+  { value: 'vote_average.desc', label: 'Highest Rated' },
+  { value: 'primary_release_date.desc', label: 'Newest First' },
+  { value: 'primary_release_date.asc', label: 'Oldest First' },
+  { value: 'revenue.desc', label: 'Most Revenue' },
+];
+
+const SORT_OPTIONS_TV = [
+  { value: 'popularity.desc', label: 'Most Popular' },
+  { value: 'vote_average.desc', label: 'Highest Rated' },
+  { value: 'first_air_date.desc', label: 'Newest First' },
+  { value: 'first_air_date.asc', label: 'Oldest First' },
+];
+
+const AIR_DATE_SORT_OPTION = { value: 'air_date.asc', label: 'Air Date' };
+
+// Default Quick Pick languages when the user's Highly Recommend list is empty,
+// ensuring English, French, and Danish are always one tap/hold away.
+const DEFAULT_QUICK_PICK_LANGUAGE_CODES = ['en', 'fr', 'da'];
+const DOCUMENTARY_GENRE_ID = 99;
+
+// Resolve an ISO 639-1 code to a human label using the TMDB language list the vm
+// already loads; falls back to the resolved language name before that list arrives.
+function labelForLanguageCode(code, languages) {
+  const match = Array.isArray(languages) ? languages.find((l) => l.code === code) : null;
+  return match?.label || resolveLanguageLabel(code);
+}
+
+function buildMultiLabel(items, selectedCodes, emptyLabel, noun) {
+  if (!selectedCodes.length) return emptyLabel;
+
+  const labels = selectedCodes
+    .map((code) => items.find((item) => item.code === code)?.label || code)
+    .filter(Boolean);
+
+  if (labels.length <= 2) return labels.join(', ');
+  return `${labels.slice(0, 2).join(', ')} +${labels.length - 2} ${noun}`;
+}
+
+function FilterDivider() {
+  return <ProgrammeHairline style={styles.filterHairline} />;
+}
+
+function MediaTypeTabs({ mediaType, onChange, colors, typography }) {
+  const tabs = [
+    { key: 'movie', label: 'Movies', icon: 'film-outline' },
+    { key: 'tv', label: 'Shows', icon: 'tv-outline' },
+  ];
+
+  return (
+    <View style={styles.mediaTabsRow}>
+      {tabs.map((tab) => {
+        const active = mediaType === tab.key;
+        return (
+          <TouchableOpacity
+            key={tab.key}
+            style={styles.mediaTab}
+            onPress={() => {
+              if (!active) {
+                Haptics.selectionAsync();
+                onChange(tab.key);
+              }
+            }}
+            activeOpacity={0.78}
+            accessibilityRole="tab"
+            accessibilityLabel={tab.key === 'movie' ? 'Show movie filters' : 'Show TV show filters'}
+            accessibilityState={{ selected: active }}
+          >
+            <Ionicons
+              name={tab.icon}
+              size={14}
+              color={active ? GOLD_ACCENT : colors.onSurfaceVariant}
+              style={{ marginRight: 6 }}
+            />
+            <Text
+              style={[
+                styles.mediaTabLabel,
+                {
+                  color: active ? colors.onSurface : colors.onSurfaceVariant,
+                  ...typography.labelSm,
+                },
+                active && styles.mediaTabLabelActive,
+              ]}
+            >
+              {tab.label}
+            </Text>
+            {active && (
+              <View style={[styles.mediaTabUnderline, { backgroundColor: GOLD_ACCENT }]} />
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Searchable Picker Modal ───────────────────────────────────────────────────
+const PickerItem = React.memo(({ item, active, onPress, colors, typography }) => {
+  return (
+    <TouchableOpacity
+      style={[pickerStyles.pickerRow, active && { backgroundColor: GOLD_ACCENT + '18' }]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={item.label}
+      accessibilityState={{ selected: active }}
+    >
+      <Text
+        numberOfLines={1}
+        style={[
+          {
+            flex: 1,
+            color: active ? GOLD_ACCENT : colors.onSurface,
+            ...typography.bodyMd,
+            fontWeight: active ? '700' : '400',
+          },
+        ]}
+      >
+        {item.label}
+      </Text>
+      {active && <Ionicons name="checkmark" size={18} color={GOLD_ACCENT} />}
+    </TouchableOpacity>
+  );
+});
+
+// The pinned-section header row (RECENT / SUGGESTED / ALL …). A fixed height so
+// the layout table's getItemLayout stays exact against the taller item rows.
+const PickerSectionHeader = React.memo(({ label, colors, typography }) => (
+  <View style={pickerStyles.sectionHeader}>
+    <Text
+      style={[
+        {
+          color: colors.onSurfaceVariant,
+          ...typography.labelSm,
+          fontWeight: '800',
+          letterSpacing: 1,
+        },
+      ]}
+    >
+      {label}
+    </Text>
+  </View>
+));
+
+// A removable chip for one current selection — the sheet's live, always-visible
+// answer to "what have I picked?", so the selection is never a scavenger hunt for
+// checkmarks down the list. Tapping the × drops it.
+const SelectedChip = React.memo(({ label, onRemove, colors, typography, radii }) => (
+  <TouchableOpacity
+    style={[pickerStyles.selectedChip, { backgroundColor: GOLD_ACCENT, borderRadius: radii.full }]}
+    onPress={onRemove}
+    activeOpacity={0.8}
+    accessibilityRole="button"
+    accessibilityLabel={`Remove ${label}`}
+  >
+    <Text
+      style={[{ color: '#141414', ...typography.labelSm, fontWeight: '800' }]}
+      numberOfLines={1}
+    >
+      {label}
+    </Text>
+    <Ionicons name="close" size={13} color="#141414" style={{ marginLeft: 5 }} />
+  </TouchableOpacity>
+));
+
+function SearchablePickerModal({
+  visible,
+  onClose,
+  title,
+  items, // [{ code, label }] — a leading { code: null } "Any" sentinel is ignored
+  selectedCodes = [],
+  recentCodes = [],
+  suggestedCodes = [],
+  allLabel = 'ALL',
+  onToggle,
+  onClear,
+  loading,
+  colors,
+  typography,
+  radii,
+}) {
+  const [query, setQuery] = useState('');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const insets = useSafeAreaInsets();
+
+  // Lift the bottom-anchored sheet above the soft keyboard. A React Native Modal
+  // runs in its own window that does NOT resize with the keyboard (adjustResize
+  // on the activity doesn't reach it), so KeyboardAvoidingView is unreliable
+  // here — as the filtered list shrinks the sheet collapses to a short bar that
+  // the keyboard then covers. Tracking the keyboard height and reserving that
+  // much space below the sheet keeps the search box and results on screen.
+  useEffect(() => {
+    if (!visible) return undefined;
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) =>
+      setKeyboardHeight(e.endCoordinates?.height ?? 0),
+    );
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [visible]);
+
+  // Typed rows (Recent → Suggested → All, or flat matches while searching) plus
+  // the per-index layout table for getItemLayout. See discoverPickerSections.
+  const { rows, layout } = useMemo(
+    () =>
+      buildPickerSections({
+        items,
+        selectedCodes,
+        recentCodes,
+        suggestedCodes,
+        query,
+        allLabel,
+      }),
+    [items, selectedCodes, recentCodes, suggestedCodes, query, allLabel],
+  );
+
+  // Selected options, in selection order, for the chip strip. Resolved against
+  // the full item list so a code always renders with its human label.
+  const selectedItems = useMemo(() => {
+    const byCode = new Map((items || []).map((it) => [it.code, it]));
+    return selectedCodes.map((code) => ({ code, label: byCode.get(code)?.label || code }));
+  }, [items, selectedCodes]);
+
+  const handleClose = () => {
+    setQuery('');
+    setKeyboardHeight(0);
+    onClose();
+  };
+
+  const handleClear = () => {
+    Haptics.selectionAsync();
+    onClear();
+    setQuery('');
+  };
+
+  const handleSelect = useCallback(
+    (code) => {
+      Haptics.selectionAsync();
+      onToggle(code);
+    },
+    [onToggle],
+  );
+
+  const renderRow = useCallback(
+    ({ item }) => {
+      if (item.type === 'header') {
+        return <PickerSectionHeader label={item.label} colors={colors} typography={typography} />;
+      }
+      const active = selectedCodes.includes(item.code);
+      return (
+        <PickerItem
+          item={item}
+          active={active}
+          onPress={() => handleSelect(item.code)}
+          colors={colors}
+          typography={typography}
+        />
+      );
+    },
+    [selectedCodes, colors, typography, handleSelect],
+  );
+
+  const getItemLayout = useCallback(
+    (_, index) =>
+      layout[index] || { length: PICKER_ITEM_HEIGHT, offset: PICKER_ITEM_HEIGHT * index, index },
+    [layout],
+  );
+
+  const keyExtractor = useCallback(
+    (item, index) => (item.type === 'header' ? `h:${item.label}:${index}` : `i:${item.code}`),
+    [],
+  );
+
+  const hasSelection = selectedCodes.length > 0;
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+      <View style={pickerStyles.overlay}>
+        {/* Reserve the keyboard's height below the sheet so it rides just above
+            the keyboard instead of being covered when the list shrinks. */}
+        <View style={[{ flex: 1, justifyContent: 'flex-end' }, { paddingBottom: keyboardHeight }]}>
+          <View
+            style={[
+              pickerStyles.sheet,
+              {
+                backgroundColor: colors.surface,
+                borderRadius: radii.xl,
+                // The safe-area inset only matters when the keyboard is down; when
+                // it's up the reserved keyboardHeight already clears the nav bar.
+                paddingBottom: keyboardHeight > 0 ? 16 : insets.bottom + 16,
+              },
+            ]}
+          >
+            {/* Header: title (with a live selection count) + Clear (when any) + Done */}
+            <View style={pickerStyles.sheetHeader}>
+              <Text
+                style={[
+                  { color: colors.onSurface, ...typography.titleMd, fontWeight: '700', flex: 1 },
+                ]}
+                numberOfLines={1}
+              >
+                {title}
+                {hasSelection ? (
+                  <Text style={[{ color: colors.onSurfaceVariant, ...typography.labelSm }]}>
+                    {`  ·  ${selectedCodes.length}`}
+                  </Text>
+                ) : null}
+              </Text>
+              {hasSelection && (
+                <TouchableOpacity
+                  onPress={handleClear}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  style={{ marginRight: 20 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Clear ${title.toLowerCase()} selection`}
+                >
+                  <Text
+                    style={[
+                      { color: colors.onSurfaceVariant, ...typography.labelSm, fontWeight: '700' },
+                    ]}
+                  >
+                    Clear
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={handleClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel={`Done selecting ${title.toLowerCase()}`}
+              >
+                <Text style={[{ color: GOLD_ACCENT, ...typography.labelSm, fontWeight: '800' }]}>
+                  Done
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Selected chips — the always-visible summary of the current picks */}
+            {hasSelection && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={pickerStyles.selectedRow}
+                style={pickerStyles.selectedScroll}
+              >
+                {selectedItems.map((it) => (
+                  <SelectedChip
+                    key={it.code}
+                    label={it.label}
+                    onRemove={() => handleSelect(it.code)}
+                    colors={colors}
+                    typography={typography}
+                    radii={radii}
+                  />
+                ))}
+              </ScrollView>
+            )}
+
+            {/* Search input */}
+            <View
+              style={[
+                pickerStyles.searchBox,
+                { backgroundColor: colors.surfaceContainerHigh, borderRadius: radii.md },
+              ]}
+            >
+              <Ionicons
+                name="search-outline"
+                size={16}
+                color={colors.onSurfaceVariant}
+                style={{ marginRight: 8 }}
+              />
+              <TextInput
+                style={[{ flex: 1, color: colors.onSurface, ...typography.bodyMd }]}
+                placeholder="Search…"
+                placeholderTextColor={colors.onSurfaceVariant}
+                value={query}
+                onChangeText={setQuery}
+                autoFocus
+                autoCorrect={false}
+              />
+              {query.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setQuery('')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear picker search"
+                >
+                  <Ionicons name="close-circle-outline" size={16} color={colors.onSurfaceVariant} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {loading ? (
+              <PickerListSkeleton count={8} />
+            ) : (
+              <FlatList
+                data={rows}
+                keyExtractor={keyExtractor}
+                style={{ maxHeight: keyboardHeight > 0 ? 260 : 380 }}
+                keyboardShouldPersistTaps="handled"
+                renderItem={renderRow}
+                initialNumToRender={20}
+                maxToRenderPerBatch={20}
+                windowSize={11}
+                getItemLayout={getItemLayout}
+                ListEmptyComponent={
+                  <Text
+                    style={[
+                      {
+                        color: colors.onSurfaceVariant,
+                        ...typography.bodyMd,
+                        textAlign: 'center',
+                        marginTop: 24,
+                      },
+                    ]}
+                  >
+                    No matches found
+                  </Text>
+                }
+              />
+            )}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────────
+
+export function DiscoverScreen({
+  onSelectItem,
+  vm,
+  onToggleWatchlist,
+  watchlistIds = [],
+  recommendedLanguageCodes = [],
+}) {
+  const { theme } = useTheme();
+  const { colors, typography, radii } = theme;
+  const c = colors;
+  const insets = useSafeAreaInsets();
+  const bottomNavScroll = useBottomNavScroll();
+  const scrollRef = useRef(null);
+
+  const bottomSheet = useBottomSheet();
+
+  const [langModalVisible, setLangModalVisible] = useState(false);
+  const [countryModalVisible, setCountryModalVisible] = useState(false);
+  const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const previousMediaTypeRef = useRef(vm.filters.mediaType);
+
+  // Recent language / country picks, persisted so a returning user sees what they
+  // chose last time instead of a cold alphabetical scroll (see
+  // discoverRecentsStorage). Loaded once on mount; pushed on each add.
+  const [recentLanguageCodes, setRecentLanguageCodes] = useState([]);
+  const [recentCountryCodes, setRecentCountryCodes] = useState([]);
+
+  // Sticky footer (Search + live count). It rides the bottom-nav auto-hide.
+  // (It used to also duck for the keyboard raised by the year/rating/runtime text
+  // inputs; those are sliders now, so nothing on this scroll summons a keyboard.)
+  const { visible: navVisible } = useBottomNavVisibility();
+  const [footerH, setFooterH] = useState(scale(120));
+  const footerTranslate = useRef(new Animated.Value(0)).current;
+
+  // Sort options depend on mediaType and airing filter
+  const sortOptions = useMemo(() => {
+    const base = vm.filters.mediaType === 'movie' ? SORT_OPTIONS_MOVIE : SORT_OPTIONS_TV;
+    if (vm.filters.mediaType === 'tv' && vm.filters.airingThisWeek) {
+      return [...base, AIR_DATE_SORT_OPTION];
+    }
+    return base;
+  }, [vm.filters.mediaType, vm.filters.airingThisWeek]);
+
+  // Ensure current sortBy is valid for the current media type
+  const validSortValues = sortOptions.map((o) => o.value);
+  const displayedSortBy = validSortValues.includes(vm.filters.sortBy)
+    ? vm.filters.sortBy
+    : 'popularity.desc';
+
+  // Personalized top languages from Highly Recommend (falling back to English,
+  // French, Danish so those favourites are always immediately reachable).
+  const quickPickLanguages = useMemo(() => {
+    const baseCodes =
+      Array.isArray(recommendedLanguageCodes) && recommendedLanguageCodes.length > 0
+        ? recommendedLanguageCodes
+        : DEFAULT_QUICK_PICK_LANGUAGE_CODES;
+    // Ensure English, French, Danish are always present alongside personalized top picks
+    const mergedCodes = [...new Set([...baseCodes, ...DEFAULT_QUICK_PICK_LANGUAGE_CODES])];
+    return mergedCodes.map((code) => ({
+      code,
+      label: labelForLanguageCode(code, vm.languages),
+    }));
+  }, [recommendedLanguageCodes, vm.languages]);
+
+  // Vibes & Formats quick picks applicable to the active mediaType (Movies vs Shows).
+  const vibeQuickPicks = useMemo(
+    () =>
+      VIBE_QUICK_PICK_FILTERS.filter((f) =>
+        isSmartFilterApplicableToMediaType(f.key, vm.filters.mediaType),
+      ),
+    [vm.filters.mediaType],
+  );
+
+  // Suggested languages for the picker's pinned group: the user's own top
+  // languages first (the same signal Quick Picks runs on), then the static
+  // popular set as a fallback so a thin recommend list still yields a useful
+  // short list. Country has no per-user signal, so its Suggested group is just
+  // the popular set.
+  const suggestedLanguageCodes = useMemo(
+    () => [...recommendedLanguageCodes, ...POPULAR_LANGUAGE_CODES],
+    [recommendedLanguageCodes],
+  );
+
+  const selectedLanguageCodes = vm.filters.languageCodes || [];
+  const excludedLanguageCodes = vm.filters.excludeLanguageCodes || [];
+  const selectedOriginCountries = vm.filters.originCountries || [];
+  const includeSmartTags = vm.filters.includeSmartTags || [];
+  const excludeSmartTags = vm.filters.excludeSmartTags || [];
+
+  const activeRegionTags = useMemo(
+    () =>
+      REGION_QUICK_PICK_FILTERS.filter(
+        (f) => includeSmartTags.includes(f.key) || excludeSmartTags.includes(f.key),
+      ),
+    [includeSmartTags, excludeSmartTags],
+  );
+
+  const languageActive =
+    selectedLanguageCodes.length > 0 ||
+    excludedLanguageCodes.length > 0 ||
+    !!vm.filters.excludeEnglish ||
+    activeRegionTags.length > 0;
+
+  const languageLabel = useMemo(() => {
+    const parts = [];
+    activeRegionTags.forEach((f) => {
+      const isEx = excludeSmartTags.includes(f.key);
+      parts.push(isEx ? `Not ${f.label}` : f.label);
+    });
+    if (vm.filters.excludeEnglish && !includeSmartTags.includes('non_english')) {
+      parts.push('Non-English');
+    }
+    if (selectedLanguageCodes.length > 0) {
+      parts.push(buildMultiLabel(vm.languages, selectedLanguageCodes, '', 'languages'));
+    }
+    if (excludedLanguageCodes.length > 0) {
+      const exLabel = buildMultiLabel(vm.languages, excludedLanguageCodes, '', 'languages');
+      parts.push(`Not ${exLabel}`);
+    }
+    if (parts.length === 0) return 'Any Language';
+    return parts.join(' · ');
+  }, [
+    activeRegionTags,
+    excludeSmartTags,
+    includeSmartTags,
+    vm.filters.excludeEnglish,
+    selectedLanguageCodes,
+    excludedLanguageCodes,
+    vm.languages,
+  ]);
+
+  const activeCountryScopedTags = useMemo(
+    () =>
+      REGION_QUICK_PICK_FILTERS.filter(
+        (f) =>
+          Array.isArray(f.originCountries) &&
+          f.originCountries.length > 0 &&
+          (includeSmartTags.includes(f.key) || excludeSmartTags.includes(f.key)),
+      ),
+    [includeSmartTags, excludeSmartTags],
+  );
+
+  const countryActive = selectedOriginCountries.length > 0 || activeCountryScopedTags.length > 0;
+  const countryLabel = useMemo(() => {
+    const parts = [];
+    activeCountryScopedTags.forEach((f) => {
+      const isEx = excludeSmartTags.includes(f.key);
+      parts.push(isEx ? `Not ${f.label}` : `${f.label} (${f.originCountries.length})`);
+    });
+    if (selectedOriginCountries.length > 0) {
+      parts.push(buildMultiLabel(vm.countries, selectedOriginCountries, '', 'countries'));
+    }
+    if (parts.length === 0) return 'Any Country';
+    return parts.join(' · ');
+  }, [activeCountryScopedTags, excludeSmartTags, selectedOriginCountries, vm.countries]);
+
+  const [defaultCountry, setDefaultCountry] = useState(null);
+
+  // Load remembered country preference
+  useEffect(() => {
+    let alive = true;
+    loadWhereToWatchPrefs()
+      .then((prefs) => {
+        if (alive && prefs?.countryCode) {
+          setDefaultCountry({ code: prefs.countryCode, label: prefs.countryLabel });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const streamingActive = Boolean(vm.filters.watchServiceKey);
+  const streamingLabel = useMemo(() => {
+    if (!vm.filters.watchServiceKey) return 'Streaming: All';
+    const sName = getServiceLabel(vm.filters.watchServiceKey);
+    const rName = vm.filters.watchRegionLabel || vm.filters.watchRegion || '';
+    return rName ? `Streaming: ${sName} · ${rName}` : `Streaming: ${sName}`;
+  }, [vm.filters.watchServiceKey, vm.filters.watchRegion, vm.filters.watchRegionLabel]);
+
+  const openStreamingSheet = useCallback(() => {
+    bottomSheet.show(
+      (sheetId) => (
+        <DiscoverStreamingSheet
+          selectedServiceKey={vm.filters.watchServiceKey}
+          selectedRegionCode={vm.filters.watchRegion || defaultCountry?.code}
+          selectedRegionLabel={vm.filters.watchRegionLabel || defaultCountry?.label}
+          onSelect={({ serviceKey, regionCode, regionLabel }) => {
+            vm.updateFilter('watchServiceKey', serviceKey);
+            vm.updateFilter('watchRegion', regionCode);
+            vm.updateFilter('watchRegionLabel', regionLabel);
+            if (regionCode && regionLabel) {
+              saveWhereToWatchPrefs({
+                countryCode: regionCode,
+                countryLabel: regionLabel,
+                serviceKey: serviceKey || null,
+              });
+            }
+            bottomSheet.dismiss(sheetId);
+          }}
+        />
+      ),
+      {
+        title: 'Streaming',
+        centerTitle: true,
+        showCloseButton: false,
+        size: 'large',
+        scrollable: true,
+      },
+    );
+  }, [bottomSheet, vm]);
+
+  const advancedCriteriaActive =
+    !!vm.filters.fromYear ||
+    !!vm.filters.toYear ||
+    !!vm.filters.minRuntime ||
+    !!vm.filters.maxRuntime ||
+    vm.filters.sortBy !== 'popularity.desc';
+
+  // Load genres when mediaType changes; reset genre selections that use disjoint
+  // Movie/TV IDs while preserving universal Quick Picks (languages, regions,
+  // anime, books, true story, stand-up, hidden gems) and translating sortBy.
+  useEffect(() => {
+    vm.loadGenres(vm.filters.mediaType);
+    const previousMediaType = previousMediaTypeRef.current;
+    if (previousMediaType !== vm.filters.mediaType) {
+      const nextMediaType = vm.filters.mediaType;
+      // Preserve Documentary (id 99 is identical on both Movie and TV in TMDB)
+      vm.updateFilter(
+        'genreIds',
+        (vm.filters.genreIds || []).filter((id) => id === DOCUMENTARY_GENRE_ID),
+      );
+      vm.updateFilter(
+        'excludeGenreIds',
+        (vm.filters.excludeGenreIds || []).filter((id) => id === DOCUMENTARY_GENRE_ID),
+      );
+      vm.updateFilter(
+        'includeSmartTags',
+        (vm.filters.includeSmartTags || []).filter((key) =>
+          isSmartFilterApplicableToMediaType(key, nextMediaType),
+        ),
+      );
+      vm.updateFilter(
+        'excludeSmartTags',
+        (vm.filters.excludeSmartTags || []).filter((key) =>
+          isSmartFilterApplicableToMediaType(key, nextMediaType),
+        ),
+      );
+      if (nextMediaType === 'tv') {
+        vm.updateFilter('minRuntime', '');
+        vm.updateFilter('maxRuntime', '');
+      } else {
+        vm.updateFilter('airingThisWeek', false);
+        vm.updateFilter('excludeAiringThisWeek', false);
+        vm.updateFilter('minSeasons', '');
+        vm.updateFilter('maxSeasons', '');
+        vm.updateFilter('tvStatus', '');
+      }
+      const nextSort = translateSortByForMediaType(vm.filters.sortBy, nextMediaType);
+      if (nextSort !== vm.filters.sortBy) {
+        vm.updateFilter('sortBy', nextSort);
+      }
+      previousMediaTypeRef.current = nextMediaType;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vm.filters.mediaType]);
+
+  // Preload languages & countries on mount
+  useEffect(() => {
+    vm.loadLanguages();
+    vm.loadCountries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load persisted recent picks once on mount.
+  useEffect(() => {
+    let alive = true;
+    loadRecentLanguageCodes().then((codes) => {
+      if (alive) setRecentLanguageCodes(codes);
+    });
+    loadRecentCountryCodes().then((codes) => {
+      if (alive) setRecentCountryCodes(codes);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Record a picked code into the persisted recents (add-only: removing a
+  // selection leaves history intact). Fire-and-forget the write.
+  const rememberRecentLanguage = useCallback((code) => {
+    setRecentLanguageCodes((prev) => {
+      const next = pushRecent(prev, code);
+      saveRecentLanguageCodes(next);
+      return next;
+    });
+  }, []);
+
+  const rememberRecentCountry = useCallback((code) => {
+    setRecentCountryCodes((prev) => {
+      const next = pushRecent(prev, code);
+      saveRecentCountryCodes(next);
+      return next;
+    });
+  }, []);
+
+  // Slide the footer down in concert with the bottom nav. Mirrors BottomNav's own
+  // RN-Animated translateY, which is the one place native-driver translate is
+  // proven reliable here.
+  useEffect(() => {
+    Animated.timing(footerTranslate, {
+      toValue: navVisible ? 0 : footerH + scale(24),
+      duration: FADE_MS,
+      useNativeDriver: true,
+    }).start();
+  }, [navVisible, footerH, footerTranslate]);
+
+  // Two-gesture genre grammar (see genreTriState): TAP toggles "want it"
+  // (neutral \u2194 include, and clears an exclude), HOLD toggles "don't want it"
+  // (any state \u2192 exclude, exclude \u2192 neutral). The vm's toggle* helpers are pure
+  // include / exclude toggles that also clear the opposite group, so driving the
+  // chip to the reducer's target is a direct call \u2014 exclude is never routed
+  // through a transient include of the genre being rejected.
+  const applyGenre = (id, gesture) => {
+    const current = genreStateFor(id, vm.filters);
+    const target = reduceTriState(current, gesture);
+    if (target === current) return;
+    if (target === GENRE_STATE.INCLUDE) {
+      vm.toggleGenre(id); // neutral \u2192 include
+    } else if (target === GENRE_STATE.EXCLUDE) {
+      vm.toggleExcludeGenre(id); // neutral / include \u2192 exclude
+    } else if (current === GENRE_STATE.INCLUDE) {
+      vm.toggleGenre(id); // include \u2192 neutral
+    } else {
+      vm.toggleExcludeGenre(id); // exclude \u2192 neutral
+    }
+  };
+
+  // Same two-gesture grammar for a smart filter, over its include / exclude groups.
+  const applySmartTag = (key, gesture) => {
+    const current = smartTagStateFor(key, vm.filters);
+    const target = reduceTriState(current, gesture);
+    if (target === current) return;
+    if (target === GENRE_STATE.INCLUDE) {
+      vm.toggleIncludeSmartTag(key); // neutral -> include
+    } else if (target === GENRE_STATE.EXCLUDE) {
+      vm.toggleSmartTag(key); // neutral / include -> exclude
+    } else if (current === GENRE_STATE.INCLUDE) {
+      vm.toggleIncludeSmartTag(key); // include -> neutral
+    } else {
+      vm.toggleSmartTag(key); // exclude -> neutral
+    }
+  };
+
+  // Same two-gesture grammar for individual Quick Pick languages (English, French, Danish, …).
+  const applyLanguageQuickPick = (code, gesture) => {
+    const current = languageStateFor(code, vm.filters);
+    const target = reduceTriState(current, gesture);
+    if (target === current) return;
+    if (target === GENRE_STATE.INCLUDE) {
+      rememberRecentLanguage(code);
+      vm.toggleIncludeLanguage(code);
+    } else if (target === GENRE_STATE.EXCLUDE) {
+      vm.toggleExcludeLanguage(code);
+    } else if (current === GENRE_STATE.INCLUDE) {
+      vm.toggleIncludeLanguage(code);
+    } else {
+      vm.toggleExcludeLanguage(code);
+    }
+  };
+
+  // Same two-gesture grammar for "Airing this week" schedule Quick Pick.
+  const applyAiringQuickPick = (gesture) => {
+    const current = airingStateFor(vm.filters);
+    const target = reduceTriState(current, gesture);
+    if (target === current) return;
+    vm.setAiringState(target);
+  };
+
+  const clearGenreFilters = () => {
+    vm.updateFilter('genreIds', []);
+    vm.updateFilter('excludeGenreIds', []);
+  };
+
+  const filterSurface = colors.glass;
+
+  const atmosphereColors = useMemo(
+    () => [colors.surfaceContainerHigh, colors.background],
+    [colors.surfaceContainerHigh, colors.background],
+  );
+
+  // ── Search button: live count + stale-aware label ──────────────────────────
+  const previewCount = vm.previewCount;
+  const hasPreview = previewCount != null;
+  const zeroMatches = hasPreview && previewCount === 0;
+  const searchDisabled = vm.loading || zeroMatches;
+  const countText = hasPreview ? previewCount.toLocaleString() : null;
+  const searchLabel = zeroMatches
+    ? 'No matches'
+    : vm.resultsStale
+      ? countText
+        ? `Update · ${countText}`
+        : 'Update'
+      : countText
+        ? `Search · ${countText}`
+        : 'Search';
+  const searchAccessibilityLabel = zeroMatches
+    ? 'No titles match these filters'
+    : `${vm.resultsStale ? 'Update results' : 'Search'}${
+        hasPreview ? `, ${previewCount} titles` : ''
+      }`;
+
+  // Rec #1(a): the whole screen is now a single virtualized FlatList — the filter
+  // stack rides in ListHeaderComponent, the poster grid is the list data, and
+  // `onEndReached` prefetches the next page so a browse session never stops under
+  // the thumb. The old manual "Load More" button survives as a fast-flick fallback
+  // and the retry affordance (see buildResultsView). Virtualization is what makes
+  // auto-prefetch safe: without recycling, auto-loading would grow an unbounded
+  // tree of mounted poster cards — the very tree the tap-friction used to bound.
+  const handleEndReached = useCallback(() => {
+    if (
+      !shouldPrefetchNextPage({
+        hasSearched: vm.hasSearched,
+        loading: vm.loading,
+        loadingMore: vm.loadingMore,
+        loadMoreError: vm.loadMoreError,
+        hasMore: vm.hasMore,
+      })
+    ) {
+      return;
+    }
+    vm.loadMore();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vm.hasSearched, vm.loading, vm.loadingMore, vm.loadMoreError, vm.hasMore, vm.loadMore]);
+
+  const rv = buildResultsView({ vm, colors: c, typography, radii });
+
+  const renderGridItem = ({ item }) => (
+    <DiscoverCard
+      item={item}
+      colors={c}
+      typography={typography}
+      radii={radii}
+      onPress={() => onSelectItem(item)}
+      onQuickSave={() => onToggleWatchlist?.(item)}
+      isSaved={watchlistIds.includes(watchlistEntryKey(item))}
+      showAirDay={rv.showAirDay}
+    />
+  );
+
+  // The filter stack + the results/trending section header. Built as an element
+  // (not an inline component) so React reconciles it in place across renders —
+  // remounting it would tear down an in-progress RangeSlider drag.
+  const listHeader = (
+    <>
+      <ProgrammeSectionHeader
+        eyebrow="DISCOVER"
+        title="Find something to watch"
+        subtitle="Start with a vibe, or fine-tune below"
+      />
+
+      <MediaTypeTabs
+        mediaType={vm.filters.mediaType}
+        onChange={(type) => vm.updateFilter('mediaType', type)}
+        colors={c}
+        typography={typography}
+      />
+
+      <View style={styles.filterBand}>
+        <QuickPicksSection
+          languages={quickPickLanguages}
+          regionFilters={REGION_QUICK_PICK_FILTERS}
+          vibeFilters={vibeQuickPicks}
+          filters={vm.filters}
+          onApplyLanguage={applyLanguageQuickPick}
+          onApplySmartTag={applySmartTag}
+          onApplyAiring={applyAiringQuickPick}
+          onApplyGenre={applyGenre}
+          onClearAll={vm.clearQuickPicks}
+          colors={c}
+          typography={typography}
+          radii={radii}
+        />
+      </View>
+
+      <FilterDivider />
+
+      <View style={styles.filterBand}>
+        <GenreFilterSection
+          genres={vm.genres}
+          genresLoading={vm.genresLoading}
+          genreIds={vm.filters.genreIds}
+          genreLogic={vm.filters.genreLogic}
+          excludeGenreIds={vm.filters.excludeGenreIds}
+          onApplyGenre={applyGenre}
+          onUpdateGenreLogic={(v) => vm.updateFilter('genreLogic', v)}
+          onClearAll={clearGenreFilters}
+          colors={c}
+          typography={typography}
+          radii={radii}
+        />
+      </View>
+
+      <FilterDivider />
+
+      <View style={styles.filterBand}>
+        <SectionLabel
+          label="Rating"
+          value={formatRatingRange(vm.filters.minRating, vm.filters.maxRating)}
+          colors={c}
+          typography={typography}
+        />
+        <RatingFilterControl
+          minRating={vm.filters.minRating}
+          maxRating={vm.filters.maxRating}
+          onChange={(lo, hi) => {
+            vm.updateFilter('minRating', lo);
+            vm.updateFilter('maxRating', hi);
+          }}
+          colors={c}
+          typography={typography}
+        />
+      </View>
+
+      {vm.filters.mediaType === 'tv' && (
+        <>
+          <FilterDivider />
+
+          <View style={styles.filterBand}>
+            <SectionLabel
+              label="Status"
+              value={formatTvStatus(vm.filters.tvStatus)}
+              colors={c}
+              typography={typography}
+            />
+            <TvStatusFilterControl
+              tvStatus={vm.filters.tvStatus}
+              onChange={(status) => vm.updateFilter('tvStatus', status)}
+              colors={c}
+              typography={typography}
+            />
+          </View>
+
+          <FilterDivider />
+
+          <View style={styles.filterBand}>
+            <SectionLabel
+              label="Seasons"
+              value={formatSeasonsRange(vm.filters.minSeasons, vm.filters.maxSeasons)}
+              colors={c}
+              typography={typography}
+            />
+            <SeasonsFilterControl
+              minSeasons={vm.filters.minSeasons}
+              maxSeasons={vm.filters.maxSeasons}
+              onChange={(minS, maxS) => {
+                vm.updateFilter('minSeasons', minS);
+                vm.updateFilter('maxSeasons', maxS);
+              }}
+              colors={c}
+              typography={typography}
+            />
+          </View>
+        </>
+      )}
+
+      <FilterDivider />
+
+      <View style={styles.filterBand}>
+        <SectionLabel label="Language" colors={c} typography={typography} />
+        <InlinePickerButton
+          icon="language-outline"
+          label={languageLabel}
+          active={languageActive}
+          onOpen={() => setLangModalVisible(true)}
+          onClear={() => vm.clearPreset()}
+          accessibilityLabel={`Language, ${languageLabel}`}
+          clearAccessibilityLabel="Clear language filter"
+          surface={filterSurface}
+          colors={c}
+          typography={typography}
+          radii={radii}
+        />
+      </View>
+
+      {/* Country (origin) — now offered for movies and TV alike. */}
+      <FilterDivider />
+      <View style={styles.filterBand}>
+        <SectionLabel label="Country" colors={c} typography={typography} />
+        <InlinePickerButton
+          icon="globe-outline"
+          label={countryLabel}
+          active={countryActive}
+          onOpen={() => setCountryModalVisible(true)}
+          onClear={() => vm.updateFilter('originCountries', [])}
+          accessibilityLabel={`Country, ${countryLabel}`}
+          clearAccessibilityLabel="Clear country filter"
+          surface={filterSurface}
+          colors={c}
+          typography={typography}
+          radii={radii}
+        />
+      </View>
+
+      {/* Streaming Service & Region */}
+      <FilterDivider />
+      <View style={styles.filterBand}>
+        <SectionLabel
+          label="Streaming"
+          value={streamingActive ? (vm.filters.watchRegionLabel || vm.filters.watchRegion) : null}
+          colors={c}
+          typography={typography}
+        />
+        <View style={styles.streamingTextButton}>
+          <TouchableOpacity
+            onPress={openStreamingSheet}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Streaming service, ${streamingLabel}`}
+            style={{ flex: 1 }}
+          >
+            <Text
+              style={[
+                styles.streamingTextLabel,
+                {
+                  color: streamingActive ? GOLD_ACCENT : c.onSurfaceVariant,
+                  ...typography.bodyMd,
+                  fontWeight: streamingActive ? '600' : '400',
+                },
+              ]}
+              numberOfLines={1}
+            >
+              {streamingLabel}
+            </Text>
+          </TouchableOpacity>
+          {streamingActive ? (
+            <TouchableOpacity
+              onPress={() => {
+                vm.updateFilter('watchServiceKey', null);
+              }}
+              style={styles.streamingClearButton}
+              accessibilityRole="button"
+              accessibilityLabel="Clear streaming filter"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={[{ color: c.onSurfaceVariant, ...typography.labelSm }]}>
+                Clear
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+
+      <FilterDivider />
+
+      <View style={styles.filterBand}>
+        <TouchableOpacity
+          style={styles.advancedToggle}
+          onPress={() => {
+            Haptics.selectionAsync();
+            setAdvancedExpanded((open) => !open);
+          }}
+          activeOpacity={0.78}
+          accessibilityRole="button"
+          accessibilityLabel={`${advancedExpanded ? 'Collapse' : 'Expand'} advanced filters`}
+          accessibilityState={{ expanded: advancedExpanded }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.sectionLabel, { color: c.onSurface, ...typography.labelSm }]}>
+              Advanced
+            </Text>
+            {advancedCriteriaActive ? (
+              <Text style={[{ color: GOLD_ACCENT, ...typography.labelSm, marginTop: 2 }]}>
+                Year, runtime, or sort customized
+              </Text>
+            ) : (
+              <Text style={[{ color: c.onSurfaceVariant, ...typography.labelSm, marginTop: 2 }]}>
+                Release year, runtime, sort order
+              </Text>
+            )}
+          </View>
+          <Ionicons
+            name={advancedExpanded ? 'chevron-up-outline' : 'chevron-down-outline'}
+            size={16}
+            color={advancedCriteriaActive ? GOLD_ACCENT : c.onSurfaceVariant}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {advancedExpanded && (
+        <>
+          <View style={styles.filterBand}>
+            <SectionLabel
+              label="Release Year"
+              value={formatYearRange(vm.filters.fromYear, vm.filters.toYear)}
+              colors={c}
+              typography={typography}
+            />
+            <YearFilterControl
+              fromYear={vm.filters.fromYear}
+              toYear={vm.filters.toYear}
+              onChange={(fromY, toY) => {
+                vm.updateFilter('fromYear', fromY);
+                vm.updateFilter('toYear', toY);
+              }}
+              colors={c}
+              typography={typography}
+            />
+          </View>
+
+          {vm.filters.mediaType === 'movie' && (
+            <>
+              <FilterDivider />
+
+              <View style={styles.filterBand}>
+                <SectionLabel
+                  label="Runtime"
+                  value={formatRuntimeRange(vm.filters.minRuntime, vm.filters.maxRuntime)}
+                  colors={c}
+                  typography={typography}
+                />
+                <RuntimeFilterControl
+                  minRuntime={vm.filters.minRuntime}
+                  maxRuntime={vm.filters.maxRuntime}
+                  onChange={(minR, maxR) => {
+                    vm.updateFilter('minRuntime', minR);
+                    vm.updateFilter('maxRuntime', maxR);
+                  }}
+                  colors={c}
+                  typography={typography}
+                />
+              </View>
+            </>
+          )}
+
+          <FilterDivider />
+
+          <View style={styles.filterBand}>
+            <SectionLabel label="Sort" colors={c} typography={typography} />
+            <SortByControl
+              sortOptions={sortOptions}
+              displayedSortBy={displayedSortBy}
+              onChange={(value) => vm.updateFilter('sortBy', value)}
+              colors={c}
+              typography={typography}
+              radii={radii}
+            />
+          </View>
+        </>
+      )}
+
+      <ProgrammeHairline style={styles.resultsHairline} />
+
+      {rv.headerNode}
+    </>
+  );
+
+  return (
+    <View style={[styles.root, { backgroundColor: c.background }]}>
+      <LinearGradient colors={atmosphereColors} style={styles.atmosphereTop} pointerEvents="none" />
+      <FlatList
+        ref={scrollRef}
+        style={styles.root}
+        data={rv.gridData}
+        numColumns={2}
+        columnWrapperStyle={rv.gridData.length ? styles.gridColumnWrapper : undefined}
+        keyExtractor={(item) => `${item.tmdbId}-${item.mediaType}`}
+        renderItem={renderGridItem}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={rv.emptyNode}
+        ListFooterComponent={rv.footerNode}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={1}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + scale(12), paddingBottom: footerH + scale(16) },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        {...bottomNavScroll}
+      />
+
+      {/* ── Language Picker Modal (kept as Modal for keyboard support) ── */}
+      <SearchablePickerModal
+        visible={langModalVisible}
+        onClose={() => setLangModalVisible(false)}
+        title="Select Language"
+        items={vm.languages}
+        selectedCodes={selectedLanguageCodes}
+        recentCodes={recentLanguageCodes}
+        suggestedCodes={suggestedLanguageCodes}
+        allLabel="ALL LANGUAGES"
+        onToggle={(code) => {
+          if (!selectedLanguageCodes.includes(code)) rememberRecentLanguage(code);
+          vm.toggleFilterValue('languageCodes', code);
+          vm.updateFilter('activePreset', null);
+          vm.updateFilter('excludeEnglish', false);
+        }}
+        onClear={() => vm.clearPreset()}
+        loading={vm.languagesLoading}
+        colors={c}
+        typography={typography}
+        radii={radii}
+      />
+
+      {/* ── Country Picker Modal (kept as Modal for keyboard support) ── */}
+      <SearchablePickerModal
+        visible={countryModalVisible}
+        onClose={() => setCountryModalVisible(false)}
+        title="Select Country"
+        items={vm.countries}
+        selectedCodes={selectedOriginCountries}
+        recentCodes={recentCountryCodes}
+        suggestedCodes={POPULAR_COUNTRY_CODES}
+        allLabel="ALL COUNTRIES"
+        onToggle={(code) => {
+          if (!selectedOriginCountries.includes(code)) rememberRecentCountry(code);
+          vm.toggleFilterValue('originCountries', code);
+        }}
+        onClear={() => vm.updateFilter('originCountries', [])}
+        loading={vm.countriesLoading}
+        colors={c}
+        typography={typography}
+        radii={radii}
+      />
+
+      {/* ── Sticky action bar: Reset + Search (with live count) ── */}
+      <Animated.View
+        style={[
+          styles.stickyFooter,
+          {
+            backgroundColor: c.background,
+            paddingBottom: insets.bottom + scale(54) + scale(10),
+            transform: [{ translateY: footerTranslate }],
+          },
+        ]}
+        onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}
+      >
+        {vm.validationError && (
+          <View
+            style={[
+              styles.validationBannerFooter,
+              { backgroundColor: colors.error + '18', borderRadius: radii.md },
+            ]}
+          >
+            <Ionicons name="warning-outline" size={16} color={colors.error} />
+            <Text style={[styles.validationText, { color: colors.error, ...typography.bodyMd }]}>
+              {vm.validationError}
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.resetBtn, { borderRadius: radii.md, borderColor: GOLD_DIM }]}
+            onPress={vm.resetFilters}
+            accessibilityRole="button"
+            accessibilityLabel="Reset discover filters"
+          >
+            <Text
+              style={[styles.actionBtnText, { color: c.onSurfaceVariant, ...typography.labelSm }]}
+            >
+              Reset
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.searchBtn,
+              {
+                backgroundColor: zeroMatches && !vm.loading ? c.surfaceContainerHigh : GOLD_ACCENT,
+                borderRadius: radii.md,
+                borderWidth: zeroMatches && !vm.loading ? StyleSheet.hairlineWidth : 0,
+                borderColor: GOLD_DIM,
+              },
+            ]}
+            onPress={vm.search}
+            activeOpacity={0.85}
+            disabled={searchDisabled}
+            accessibilityRole="button"
+            accessibilityLabel={searchAccessibilityLabel}
+            accessibilityState={{ disabled: searchDisabled }}
+          >
+            {vm.loading ? (
+              <View style={styles.searchBtnLoader}>
+                <SkeletonBlock style={StyleSheet.absoluteFill} />
+              </View>
+            ) : (
+              <Text
+                style={[
+                  styles.actionBtnText,
+                  {
+                    color: zeroMatches ? c.onSurfaceVariant : '#141414',
+                    ...typography.labelSm,
+                  },
+                ]}
+              >
+                {searchLabel}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </View>
+  );
+}
+
+// ─── Shared Tri-State Legend & Quick Pick Chip ────────────────────────────────
+// Maps each gesture to the exact chip styling it produces:
+//   TAP  → Gold pill with checkmark (Included)
+//   HOLD → Struck-out muted grey pill with close icon (Excluded)
+
+function GestureLegendRow({ colors: c, typography, radii }) {
+  return (
+    <View style={genreStyles.legendRow}>
+      <View
+        style={[
+          genreStyles.legendSwatch,
+          { backgroundColor: GOLD_ACCENT, borderRadius: radii.full },
+        ]}
+      >
+        <Ionicons name="checkmark" size={11} color="#141414" />
+      </View>
+      <Text style={[genreStyles.legendText, { color: c.onSurfaceVariant, ...typography.labelSm }]}>
+        Tap to include
+      </Text>
+      <View
+        style={[
+          genreStyles.legendSwatch,
+          {
+            backgroundColor: c.onSurfaceVariant + '22',
+            borderRadius: radii.full,
+            borderWidth: 1,
+            borderColor: c.onSurfaceVariant + '66',
+            marginLeft: 18,
+          },
+        ]}
+      >
+        <Ionicons name="close" size={11} color={c.onSurfaceVariant} />
+      </View>
+      <Text style={[genreStyles.legendText, { color: c.onSurfaceVariant, ...typography.labelSm }]}>
+        Hold to exclude
+      </Text>
+    </View>
+  );
+}
+
+function TriStateQuickPickChip({
+  label,
+  state,
+  onGesture,
+  accessibilityCategory = 'quick pick',
+  colors: c,
+  typography,
+  radii,
+}) {
+  const included = state === GENRE_STATE.INCLUDE;
+  const excluded = state === GENRE_STATE.EXCLUDE;
+
+  let chipBg = c.surfaceContainerHigh;
+  let chipBorder = { borderWidth: 1, borderColor: GOLD_DIM };
+  let textColor = c.onSurfaceVariant;
+  let icon = null;
+  let iconColor = null;
+
+  if (included) {
+    chipBg = GOLD_ACCENT;
+    chipBorder = {};
+    textColor = '#141414';
+    icon = 'checkmark';
+    iconColor = '#141414';
+  } else if (excluded) {
+    chipBg = c.onSurfaceVariant + '22';
+    chipBorder = { borderWidth: 1, borderColor: c.onSurfaceVariant + '66' };
+    textColor = c.onSurfaceVariant;
+    icon = 'close';
+    iconColor = c.onSurfaceVariant;
+  }
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.chip,
+        { borderRadius: radii.full, backgroundColor: chipBg },
+        chipBorder,
+      ]}
+      onPress={() => {
+        Haptics.selectionAsync();
+        onGesture('tap');
+      }}
+      onLongPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onGesture('hold');
+      }}
+      delayLongPress={220}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} ${accessibilityCategory}${
+        included ? ', included' : excluded ? ', excluded' : ''
+      }`}
+      accessibilityHint="Tap to include, long-press to exclude"
+      accessibilityState={{ selected: included || excluded }}
+      accessibilityActions={[{ name: 'longpress', label: excluded ? 'Clear' : 'Exclude' }]}
+      onAccessibilityAction={(e) => {
+        if (e.nativeEvent.actionName === 'longpress') onGesture('hold');
+      }}
+    >
+      {icon && (
+        <Ionicons name={icon} size={12} color={iconColor} style={{ marginRight: 3 }} />
+      )}
+      <Text
+        style={[
+          styles.chipText,
+          { color: textColor, ...typography.labelSm },
+          excluded && styles.chipTextExcluded,
+        ]}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Quick Picks Section ───────────────────────────────────────────────────────
+// Unified two-gesture tri-state grammar across:
+//   1. Languages & Regions (English, French, Danish, …, Non-English, European Union,
+//      Middle East, Asian, African, Nordic, Latin America)
+//   2. Vibes & Formats (Airing this week, Miniseries / Under 100m, Anime,
+//      Based on a Book, True Story, Stand-Up, Hidden Gems, Documentary)
+
+function QuickPicksSection({
+  languages,
+  regionFilters,
+  vibeFilters,
+  filters,
+  onApplyLanguage,
+  onApplySmartTag,
+  onApplyAiring,
+  onApplyGenre,
+  onClearAll,
+  colors: c,
+  typography,
+  radii,
+}) {
+  const documentaryState = genreStateFor(DOCUMENTARY_GENRE_ID, filters);
+  const airingState = airingStateFor(filters);
+
+  const hasAnyQuickPick =
+    (filters.languageCodes && filters.languageCodes.length > 0) ||
+    (filters.excludeLanguageCodes && filters.excludeLanguageCodes.length > 0) ||
+    !!filters.excludeEnglish ||
+    (filters.includeSmartTags && filters.includeSmartTags.length > 0) ||
+    (filters.excludeSmartTags && filters.excludeSmartTags.length > 0) ||
+    !!filters.airingThisWeek ||
+    !!filters.excludeAiringThisWeek ||
+    documentaryState !== GENRE_STATE.NEUTRAL;
+
+  // Build concise descriptions for any active smart tags so the user can see
+  // exactly how regional & vibe filters scope the query (e.g. EU's 23 non-English
+  // languages + 27 EU member states).
+  const activeSmartSummaries = useMemo(() => {
+    const items = [];
+    const allSmart = [...regionFilters, ...vibeFilters];
+    allSmart.forEach((f) => {
+      if (filters.includeSmartTags?.includes(f.key)) {
+        items.push({ key: f.key, label: f.label, text: f.includeDescription, included: true });
+      } else if (filters.excludeSmartTags?.includes(f.key)) {
+        items.push({ key: f.key, label: f.label, text: f.excludeDescription, included: false });
+      }
+    });
+    return items;
+  }, [regionFilters, vibeFilters, filters.includeSmartTags, filters.excludeSmartTags]);
+
+  return (
+    <View>
+      <View style={styles.sectionRow}>
+        <SectionLabel label="Quick picks" colors={c} typography={typography} />
+        {hasAnyQuickPick && (
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.selectionAsync();
+              onClearAll();
+              if (documentaryState !== GENRE_STATE.NEUTRAL) {
+                onApplyGenre(
+                  DOCUMENTARY_GENRE_ID,
+                  documentaryState === GENRE_STATE.INCLUDE ? 'tap' : 'hold',
+                );
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Clear all quick picks"
+          >
+            <Text style={[{ color: GOLD_ACCENT, ...typography.labelSm }]}>Clear all</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <GestureLegendRow colors={c} typography={typography} radii={radii} />
+
+      {/* Sub-group 1: Languages & Regions */}
+      <Text
+        style={[
+          styles.quickPickSubheader,
+          { color: c.onSurfaceVariant, ...typography.labelSm },
+        ]}
+      >
+        LANGUAGES & REGIONS
+      </Text>
+      <View style={styles.chipWrap}>
+        {regionFilters.map((region) => (
+          <TriStateQuickPickChip
+            key={region.key}
+            label={region.label}
+            state={smartTagStateFor(region.key, filters)}
+            onGesture={(gesture) => onApplySmartTag(region.key, gesture)}
+            accessibilityCategory="region filter"
+            colors={c}
+            typography={typography}
+            radii={radii}
+          />
+        ))}
+        {languages.map((lang) => (
+          <TriStateQuickPickChip
+            key={`lang:${lang.code}`}
+            label={lang.label}
+            state={languageStateFor(lang.code, filters)}
+            onGesture={(gesture) => onApplyLanguage(lang.code, gesture)}
+            accessibilityCategory="language filter"
+            colors={c}
+            typography={typography}
+            radii={radii}
+          />
+        ))}
+      </View>
+
+      {/* Sub-group 2: Vibes & Formats */}
+      <Text
+        style={[
+          styles.quickPickSubheader,
+          { color: c.onSurfaceVariant, ...typography.labelSm, marginTop: 10 },
+        ]}
+      >
+        VIBES & FORMATS
+      </Text>
+      <View style={styles.chipWrap}>
+        <TriStateQuickPickChip
+          key="airing-this-week"
+          label="Airing this week"
+          state={airingState}
+          onGesture={onApplyAiring}
+          accessibilityCategory="schedule filter"
+          colors={c}
+          typography={typography}
+          radii={radii}
+        />
+        {vibeFilters.map((vibe) => (
+          <TriStateQuickPickChip
+            key={vibe.key}
+            label={vibe.label}
+            state={smartTagStateFor(vibe.key, filters)}
+            onGesture={(gesture) => onApplySmartTag(vibe.key, gesture)}
+            accessibilityCategory="vibe filter"
+            colors={c}
+            typography={typography}
+            radii={radii}
+          />
+        ))}
+        <TriStateQuickPickChip
+          key="genre:documentary"
+          label="Documentary"
+          state={documentaryState}
+          onGesture={(gesture) => onApplyGenre(DOCUMENTARY_GENRE_ID, gesture)}
+          accessibilityCategory="genre filter"
+          colors={c}
+          typography={typography}
+          radii={radii}
+        />
+      </View>
+
+      {activeSmartSummaries.length > 0 && (
+        <View style={{ marginTop: 6 }}>
+          {activeSmartSummaries.map((item) => {
+            const accentColor = item.included ? GOLD_ACCENT : c.onSurfaceVariant;
+            return (
+              <View
+                key={item.key}
+                style={[
+                  genreStyles.smartTagInfo,
+                  {
+                    backgroundColor: accentColor + '10',
+                    borderRadius: radii.sm,
+                    borderLeftColor: accentColor,
+                    marginLeft: 0,
+                    marginBottom: 6,
+                  },
+                ]}
+              >
+                <Text style={[{ color: c.onSurfaceVariant, ...typography.labelSm }]}>
+                  <Text style={{ color: item.included ? GOLD_ACCENT : c.onSurface, fontWeight: '700' }}>
+                    {`${item.label}: `}
+                  </Text>
+                  {item.text}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Inline Picker Button ──────────────────────────────────────────────────────
+// The Language / Country control: opens a searchable value picker, shows the
+// current selection, and offers an inline clear. Replaces the old nested
+// "Language & Country" sheet-that-opened-another-sheet.
+
+function InlinePickerButton({
+  icon,
+  label,
+  active,
+  onOpen,
+  onClear,
+  accessibilityLabel,
+  clearAccessibilityLabel,
+  surface,
+  colors: c,
+  typography,
+  radii,
+}) {
+  return (
+    <TouchableOpacity
+      style={[
+        styles.pickerButton,
+        {
+          backgroundColor: surface,
+          borderRadius: radii.md,
+          borderColor: active ? GOLD_ACCENT + '55' : GOLD_DIM,
+        },
+      ]}
+      onPress={onOpen}
+      activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Ionicons
+        name={icon}
+        size={16}
+        color={active ? GOLD_ACCENT : c.onSurfaceVariant}
+        style={{ marginRight: 8 }}
+      />
+      <Text
+        style={[
+          { flex: 1, color: active ? c.onSurface : c.onSurfaceVariant, ...typography.bodyMd },
+        ]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+      {active && (
+        <TouchableOpacity
+          onPress={onClear}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={clearAccessibilityLabel}
+        >
+          <Ionicons name="close-circle-outline" size={16} color={c.onSurfaceVariant} />
+        </TouchableOpacity>
+      )}
+      <Ionicons
+        name="chevron-down-outline"
+        size={16}
+        color={c.onSurfaceVariant}
+        style={{ marginLeft: 4 }}
+      />
+    </TouchableOpacity>
+  );
+}
+
+// ─── More Filters Bottom Sheet ───────────────────────────────────────────────
+
+function SortByControl({ sortOptions, displayedSortBy, onChange, colors: c, typography, radii }) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={[styles.hScroll, { marginBottom: 8 }]}
+    >
+      <View style={styles.hChipRow}>
+        {sortOptions.map((opt) => {
+          const active = displayedSortBy === opt.value;
+          return (
+            <TouchableOpacity
+              key={opt.value}
+              style={[
+                styles.chip,
+                { borderRadius: radii.md },
+                active
+                  ? { backgroundColor: GOLD_ACCENT }
+                  : {
+                      backgroundColor: c.surfaceContainerHigh,
+                      borderWidth: 1,
+                      borderColor: GOLD_DIM,
+                    },
+              ]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                onChange(opt.value);
+              }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Sort by ${opt.label}`}
+              accessibilityState={{ selected: active }}
+            >
+              <Text
+                style={[
+                  styles.chipTextUpper,
+                  { color: active ? '#141414' : c.onSurfaceVariant, ...typography.labelSm },
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+}
+
+// ─── Genre Filter Section ─────────────────────────────────────────────────────
+// One two-gesture grammar for the whole section: TAP a genre (or smart filter)
+// to include it, LONG-PRESS to exclude it. Tap again clears an include; long-
+// press again (or tap) clears an exclude. No tabs, no per-tab colour remapping —
+// a chip means exactly one thing at all times, and exclude is always one gesture
+// away instead of routed through a transient include.
+
+function GenreFilterSection({
+  genres,
+  genresLoading,
+  genreIds,
+  genreLogic,
+  excludeGenreIds,
+  onApplyGenre,
+  onUpdateGenreLogic,
+  onClearAll,
+  colors: c,
+  typography,
+  radii,
+}) {
+  const hasAnySelection = genreIds.length > 0 || excludeGenreIds.length > 0;
+
+  return (
+    <View>
+      {/* ── Section header ── */}
+      <View style={styles.sectionRow}>
+        <SectionLabel label="Genres" colors={c} typography={typography} />
+        {hasAnySelection && (
+          <TouchableOpacity
+            onPress={onClearAll}
+            accessibilityRole="button"
+            accessibilityLabel="Clear all genre filters"
+          >
+            <Text style={[{ color: GOLD_ACCENT, ...typography.labelSm }]}>Clear all</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* ── Legend: the single explainer for the section — maps each gesture to
+          the exact chip styling it produces (a struck grey chip = excluded). ── */}
+      <GestureLegendRow colors={c} typography={typography} radii={radii} />
+
+      {/* ── AND / OR logic — governs how included genres combine. Only shown with
+          2+ included genres, where the combinator actually changes results. ── */}
+      {genreIds.length > 1 && (
+        <View style={[genreStyles.logicRow]}>
+          <Text style={[{ color: c.onSurfaceVariant, ...typography.labelSm, marginRight: 8 }]}>
+            Match:
+          </Text>
+          <View
+            style={[
+              styles.logicPill,
+              { backgroundColor: c.surfaceContainerHigh, borderRadius: radii.full },
+            ]}
+          >
+            {['AND', 'OR'].map((mode) => {
+              const active = genreLogic === mode;
+              return (
+                <TouchableOpacity
+                  key={mode}
+                  style={[
+                    styles.logicOption,
+                    active && { backgroundColor: GOLD_ACCENT, borderRadius: radii.full },
+                  ]}
+                  onPress={() => {
+                    if (genreLogic !== mode) {
+                      Haptics.selectionAsync();
+                    }
+                    onUpdateGenreLogic(mode);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use ${mode} genre matching`}
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text
+                    style={[
+                      {
+                        color: active ? '#141414' : c.onSurfaceVariant,
+                        ...typography.labelSm,
+                        fontWeight: '700',
+                      },
+                    ]}
+                  >
+                    {mode}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text
+            style={[{ color: c.onSurfaceVariant, ...typography.labelSm, marginLeft: 8, flex: 1 }]}
+            numberOfLines={1}
+          >
+            {genreLogic === 'AND' ? 'all included genres' : 'any included genre'}
+          </Text>
+        </View>
+      )}
+
+      {/* ── Genre chips (tri-state) ── */}
+      {genresLoading ? (
+        <GenreChipSkeleton count={10} />
+      ) : (
+        <View style={styles.chipWrap}>
+          {genres.map((genre) => {
+            const included = genreIds.includes(genre.id);
+            const excluded = excludeGenreIds.includes(genre.id);
+            let chipBg = c.surfaceContainerHigh;
+            let chipBorder = { borderWidth: 1, borderColor: GOLD_DIM };
+            let textColor = c.onSurfaceVariant;
+            let icon = null;
+            let iconColor = null;
+            if (included) {
+              chipBg = GOLD_ACCENT;
+              chipBorder = {};
+              textColor = '#141414';
+              icon = 'checkmark';
+              iconColor = '#141414';
+            } else if (excluded) {
+              // Excluded reads as a struck-out grey chip, NOT an error-red one —
+              // it's a deliberate choice, not a fault (c.error is reserved for
+              // validation / offline states elsewhere on this screen).
+              chipBg = c.onSurfaceVariant + '22';
+              chipBorder = { borderWidth: 1, borderColor: c.onSurfaceVariant + '66' };
+              textColor = c.onSurfaceVariant;
+              icon = 'close';
+              iconColor = c.onSurfaceVariant;
+            }
+
+            return (
+              <TouchableOpacity
+                key={genre.id}
+                style={[
+                  styles.chip,
+                  { borderRadius: radii.full, backgroundColor: chipBg },
+                  chipBorder,
+                ]}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  onApplyGenre(genre.id, 'tap');
+                }}
+                onLongPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  onApplyGenre(genre.id, 'hold');
+                }}
+                delayLongPress={220}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`${genre.name} genre${
+                  included ? ', included' : excluded ? ', excluded' : ''
+                }`}
+                accessibilityHint="Tap to include, long-press to exclude"
+                accessibilityState={{ selected: included || excluded }}
+                accessibilityActions={[
+                  { name: 'longpress', label: excluded ? 'Clear' : 'Exclude' },
+                ]}
+                onAccessibilityAction={(e) => {
+                  if (e.nativeEvent.actionName === 'longpress') onApplyGenre(genre.id, 'hold');
+                }}
+              >
+                {icon && (
+                  <Ionicons name={icon} size={12} color={iconColor} style={{ marginRight: 3 }} />
+                )}
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: textColor, ...typography.labelSm },
+                    excluded && styles.chipTextExcluded,
+                  ]}
+                >
+                  {genre.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Results View ─────────────────────────────────────────────────────────────
+// Computes the four FlatList slots — the grid data, the section header (rides in
+// ListHeaderComponent under the filters), the empty/placeholder node, and the
+// footer (load-more / retry / end-of-results) — for whichever state Discover is
+// in. Pure: it builds elements but mounts nothing, so the parent FlatList owns
+// scrolling and virtualization.
+function buildResultsView({ vm, colors: c, typography, radii }) {
+  const {
+    loading,
+    error,
+    errorInfo,
+    clearError,
+    hasSearched,
+    results,
+    totalResults,
+    hasMore,
+    loadingMore,
+    loadMore,
+    loadMoreError,
+    clearLoadMoreError,
+    enrichingResults,
+  } = vm;
+
+  const empty = {
+    gridData: [],
+    headerNode: null,
+    emptyNode: null,
+    footerNode: null,
+    showAirDay: false,
+  };
+
+  // Only skeleton on a first search. A refine keeps the previous grid on screen
+  // (see search() — it no longer blanks results) and swaps under an inline
+  // "updating" badge instead of flickering to a skeleton.
+  if (loading && results.length === 0) {
+    return {
+      ...empty,
+      headerNode: <ProgrammeSectionHeader eyebrow="RESULTS" title="Searching" />,
+      emptyNode: <ResultsSkeleton count={4} />,
+    };
+  }
+
+  if (error) {
+    return {
+      ...empty,
+      emptyNode: (
+        <View style={styles.stateBox}>
+          <EmptyState
+            variant={errorInfo?.severity === 'offline' ? 'offline' : 'service'}
+            title={errorInfo?.title || 'Something went wrong'}
+            description={error}
+            primaryAction={{
+              label: 'Refresh',
+              icon: 'refresh-outline',
+              onPress: () => {
+                clearError();
+                vm.search();
+              },
+              accessibilityLabel: 'Refresh discover results',
+            }}
+            compact
+          />
+        </View>
+      ),
+    };
+  }
+
+  if (!hasSearched) {
+    // Pre-search: show the Trakt trending rail already fetched on mount instead
+    // of a blank prompt — the screen gives value on arrival. Falls back to the
+    // prompt only if trending is genuinely unavailable.
+    if (vm.trendingLoading && vm.trendingResults.length === 0) {
+      return {
+        ...empty,
+        headerNode: <ProgrammeSectionHeader eyebrow="TRENDING" title="Trending now" />,
+        emptyNode: <ResultsSkeleton count={4} />,
+      };
+    }
+    if (vm.trendingResults.length > 0) {
+      // The trending rail is a single fixed page, so it has no footer and
+      // onEndReached is inert here (handleEndReached bails when !hasSearched).
+      return {
+        ...empty,
+        gridData: vm.trendingResults,
+        headerNode: (
+          <View style={styles.resultsHeader}>
+            <ProgrammeSectionHeader
+              eyebrow="TRENDING"
+              title="Trending now"
+              subtitle="Popular this week — or set your filters and search"
+            />
+          </View>
+        ),
+      };
+    }
+    return {
+      ...empty,
+      emptyNode: (
+        <View style={styles.stateBox}>
+          <View style={[styles.stateIconCircle, { backgroundColor: GOLD_ACCENT + '15' }]}>
+            <Ionicons name="telescope-outline" size={48} color={GOLD_ACCENT} />
+          </View>
+          <Text style={[styles.stateEyebrow, { color: GOLD_ACCENT, ...typography.labelSm }]}>
+            PROGRAMME
+          </Text>
+          <Text
+            style={[
+              { color: c.onSurface, ...typography.titleLg, textAlign: 'center', marginBottom: 8 },
+            ]}
+          >
+            Set your filters
+          </Text>
+          <Text style={[{ color: c.onSurfaceVariant, ...typography.bodyMd, textAlign: 'center' }]}>
+            Adjust the filters above and tap "Search" to explore.
+          </Text>
+        </View>
+      ),
+    };
+  }
+
+  if (results.length === 0) {
+    const airingFilterActive = vm.filters.airingThisWeek && vm.filters.mediaType === 'tv';
+
+    return {
+      ...empty,
+      emptyNode: (
+        <View style={styles.stateBox}>
+          <EmptyState
+            variant="empty"
+            title={
+              airingFilterActive
+                ? 'Nothing airing in the next 7 days with these filters'
+                : 'No matches found'
+            }
+            description={
+              airingFilterActive
+                ? 'Nothing is scheduled this week under these filters. Try clearing a few, or check back as new episodes are announced.'
+                : "We couldn't find anything with those filters. Clear a few choices and search again."
+            }
+            primaryAction={{
+              label: 'Clear Filters',
+              icon: 'close-circle-outline',
+              onPress: vm.resetFilters,
+              accessibilityLabel: 'Clear discover filters',
+            }}
+            secondaryAction={{
+              label: 'Search Again',
+              onPress: vm.search,
+              accessibilityLabel: 'Search again with current filters',
+            }}
+            compact
+          />
+        </View>
+      ),
+    };
+  }
+
+  const airingFilterActive = vm.filters.airingThisWeek && vm.filters.mediaType === 'tv';
+  // The airing count is now server-truthful (air_date window returns a real
+  // total_results), so it's the same honest `totalResults` every other query uses
+  // — no more "however many of page 1 survived the client sieve".
+  const resultCount = totalResults;
+
+  const headerNode = (
+    <View style={styles.resultsHeader}>
+      <ProgrammeSectionHeader eyebrow="RESULTS" title="Programme" />
+      <View style={styles.resultsHeaderBadges}>
+        {loading && (
+          <View
+            style={[
+              styles.enrichmentBadge,
+              {
+                backgroundColor: c.surfaceContainerHigh,
+                borderRadius: radii.full,
+                borderColor: GOLD_DIM,
+              },
+            ]}
+          >
+            <SkeletonBlock style={styles.enrichmentDot} />
+            <Text
+              style={[
+                {
+                  color: c.onSurfaceVariant,
+                  ...typography.labelSm,
+                  fontWeight: '700',
+                  marginLeft: 6,
+                },
+              ]}
+            >
+              updating
+            </Text>
+          </View>
+        )}
+        {vm.resultsStale && !loading && (
+          <View
+            style={[
+              styles.countBadge,
+              { backgroundColor: c.surfaceContainerHigh, borderRadius: radii.full },
+            ]}
+          >
+            <Text style={[{ color: c.onSurfaceVariant, ...typography.labelSm, fontWeight: '700' }]}>
+              Filters changed
+            </Text>
+          </View>
+        )}
+        {enrichingResults && (
+          <View
+            style={[
+              styles.enrichmentBadge,
+              {
+                backgroundColor: c.surfaceContainerHigh,
+                borderRadius: radii.full,
+                borderColor: GOLD_DIM,
+              },
+            ]}
+          >
+            <SkeletonBlock style={styles.enrichmentDot} />
+            <Text
+              style={[
+                {
+                  color: c.onSurfaceVariant,
+                  ...typography.labelSm,
+                  fontWeight: '700',
+                  marginLeft: 6,
+                },
+              ]}
+            >
+              ratings
+            </Text>
+          </View>
+        )}
+        <View
+          style={[
+            styles.countBadge,
+            { backgroundColor: GOLD_ACCENT + '18', borderRadius: radii.full },
+          ]}
+        >
+          <Text style={[{ color: GOLD_ACCENT, ...typography.labelSm, fontWeight: '700' }]}>
+            {resultCount.toLocaleString()} found
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  // Footer: the load-more skeleton while a page is in flight (auto or manual),
+  // then either the inline retry (on a failed page) or the manual "Load More"
+  // fallback (Rec #1 keeps it for a fast flick past the prefetch trigger), then
+  // the honest end-of-results line.
+  const footerNode = (
+    <View>
+      {!loading && loadingMore && <LoadMoreSkeleton />}
+
+      {!loading && !loadingMore && loadMoreError ? (
+        <TouchableOpacity
+          style={[
+            styles.loadMoreBtn,
+            styles.loadMoreErrorBtn,
+            {
+              backgroundColor: c.error + '12',
+              borderRadius: radii.md,
+              borderColor: c.error + '44',
+            },
+          ]}
+          onPress={() => {
+            clearLoadMoreError();
+            loadMore();
+          }}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading more results"
+        >
+          <Ionicons name="refresh-outline" size={16} color={c.error} />
+          <Text
+            style={[{ color: c.error, ...typography.labelSm, fontWeight: '800', marginLeft: 6 }]}
+          >
+            Couldn't load more. Tap to retry.
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        !loading &&
+        !loadingMore &&
+        hasMore && (
+          <TouchableOpacity
+            style={[
+              styles.loadMoreBtn,
+              {
+                backgroundColor: c.surfaceContainerHigh,
+                borderRadius: radii.md,
+                borderColor: GOLD_DIM,
+              },
+            ]}
+            onPress={loadMore}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Load more results"
+          >
+            <Ionicons name="chevron-down-outline" size={16} color={GOLD_ACCENT} />
+            <Text
+              style={[
+                { color: GOLD_ACCENT, ...typography.labelSm, fontWeight: '700', marginLeft: 6 },
+              ]}
+            >
+              Load More
+            </Text>
+          </TouchableOpacity>
+        )
+      )}
+
+      {!loading && !hasMore && results.length > 0 && (
+        <Text style={[styles.endText, { color: c.onSurfaceVariant, ...typography.labelSm }]}>
+          — End of results —
+        </Text>
+      )}
+    </View>
+  );
+
+  return {
+    gridData: results,
+    headerNode,
+    emptyNode: null,
+    footerNode,
+    showAirDay: airingFilterActive,
+  };
+}
+
+// A result tile: the poster (with its always-visible bookmark button) plus an
+// OMDb ratings footnote. Saving goes through the one visible bookmark control on
+// the poster — there is no hidden swipe gesture; a swipe-action is a list-row
+// idiom that only fought the grid's own vertical scroll here.
+
+function DiscoverCard({
+  item,
+  colors: c,
+  typography,
+  radii,
+  onPress,
+  onQuickSave,
+  isSaved,
+  showAirDay = false,
+}) {
+  const omdb = item.omdbRatings || {};
+  const imdbRating = omdb.imdbRating ? omdb.imdbRating.replace('/10', '') : null;
+  const rottenTomatoes = omdb.rottenTomatoes || null;
+
+  // The poster already letters the title (and MediaArtwork renders it in-frame for
+  // the posterless tail), so we drop GridPosterCard's caption entirely — no title,
+  // no media-type icon/label. All surviving metadata is one line we own here.
+  // Lead with the air day (only under the TV "airing this week" filter) or the
+  // release year; IMDb / Rotten Tomatoes follow. Content rating (PG-13/R/TV-MA) is
+  // intentionally gone.
+  const isAirDay = showAirDay && !!item.airDay;
+  const leadMeta = isAirDay ? item.airDay : item.year ? String(item.year) : null;
+  // Ratings trail the lead; under the airing filter the lead is the air day,
+  // rendered gold + bold so the grid reads as a chronological agenda rather than
+  // a poster wall with a date buried in grey.
+  const seasonsLabel =
+    item.mediaType === 'tv' && item.numberOfSeasons
+      ? formatSeasonsCountLabel(item.numberOfSeasons)
+      : null;
+  const restParts = [
+    seasonsLabel,
+    imdbRating ? `IMDb ${imdbRating}` : null,
+    rottenTomatoes ? `RT ${rottenTomatoes}` : null,
+  ].filter(Boolean);
+
+  return (
+    <TouchableOpacity
+      style={styles.gridCard}
+      onPress={onPress}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={`Open details for ${item.title}`}
+    >
+      <GridPosterCard
+        item={item}
+        colors={c}
+        typography={typography}
+        radii={radii}
+        pressable={false}
+        showCaption={false}
+        saved={isSaved}
+        onToggleWatchlist={onQuickSave ? () => onQuickSave() : undefined}
+      />
+      {(leadMeta || restParts.length > 0) && (
+        <Text
+          style={[styles.omdbMetaLine, { color: c.onSurfaceVariant, ...typography.labelSm }]}
+          numberOfLines={1}
+        >
+          {leadMeta ? (
+            isAirDay ? (
+              <Text style={{ color: GOLD_ACCENT, fontWeight: '700' }}>{leadMeta}</Text>
+            ) : (
+              leadMeta
+            )
+          ) : null}
+          {leadMeta && restParts.length > 0 ? ' · ' : ''}
+          {restParts.join(' · ')}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+// ─── Micro Components ──────────────────────────────────────────────────────────
+
+function SectionLabel({ label, value, colors, typography }) {
+  // With a `value`, the label carries a live readout on the right — the current
+  // range made legible (e.g. "RATING · 7+"), so a bound like the default 7.0 floor
+  // announces itself instead of hiding inside a control.
+  if (value) {
+    return (
+      <View style={styles.rangeLabelRow}>
+        <Text
+          style={[
+            styles.sectionLabel,
+            { color: colors.onSurface, ...typography.labelSm, marginBottom: 0 },
+          ]}
+        >
+          {label}
+        </Text>
+        <Text style={[styles.rangeReadout, { color: GOLD_ACCENT, ...typography.labelSm }]}>
+          {value}
+        </Text>
+      </View>
+    );
+  }
+  return (
+    <Text style={[styles.sectionLabel, { color: colors.onSurface, ...typography.labelSm }]}>
+      {label}
+    </Text>
+  );
+}
+
+// ─── Picker Sheet Styles ───────────────────────────────────────────────────────
+
+const pickerStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  // Fixed height (not minHeight) so the getItemLayout offset table stays exact;
+  // labels are numberOfLines={1} so a long name can't grow the row.
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    height: 48,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
+  sectionHeader: {
+    height: 40,
+    justifyContent: 'flex-end',
+    paddingBottom: 8,
+    paddingHorizontal: 4,
+  },
+  selectedScroll: {
+    maxHeight: 44,
+    marginBottom: 8,
+  },
+  selectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+    paddingRight: 8,
+  },
+  selectedChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 36,
+  },
+});
+
+const genreStyles = StyleSheet.create({
+  tabRow: {
+    flexDirection: 'row',
+    padding: 4,
+    marginBottom: 16,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logicRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    paddingHorizontal: 4,
+  },
+  legendSwatch: {
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  legendText: {
+    fontWeight: '600',
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    padding: 12,
+    borderLeftWidth: 4,
+    marginBottom: 16,
+  },
+  smartTagsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  smartTagChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  smartTagBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginLeft: 12,
+  },
+  smartTagInfo: {
+    padding: 12,
+    borderLeftWidth: 2,
+    marginBottom: 12,
+    marginLeft: 8,
+  },
+});
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  atmosphereTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: scale(220),
+    zIndex: 0,
+  },
+  content: {
+    paddingHorizontal: GRID_PAD,
+  },
+
+  mediaTabsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: scale(28),
+    marginBottom: scale(4),
+  },
+  mediaTab: {
+    alignItems: 'center',
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: scale(4),
+    position: 'relative',
+  },
+  mediaTabLabel: {
+    fontWeight: '600',
+    letterSpacing: 1,
+    paddingEnd: 2,
+    textTransform: 'uppercase',
+  },
+  mediaTabLabelActive: {
+    fontWeight: '800',
+  },
+  mediaTabUnderline: {
+    position: 'absolute',
+    bottom: 2,
+    height: 2,
+    width: '100%',
+    borderRadius: 1,
+  },
+
+  filterBand: {
+    paddingVertical: scale(14),
+  },
+  advancedToggle: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    minHeight: 48,
+  },
+  filterHairline: {
+    marginBottom: 0,
+  },
+  resultsHairline: {
+    marginBottom: scale(24),
+    marginTop: scale(8),
+  },
+
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: scale(12),
+  },
+  sectionLabel: {
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    marginBottom: scale(12),
+    paddingEnd: 2,
+    textTransform: 'uppercase',
+    fontSize: scale(11),
+  },
+
+  logicPill: { flexDirection: 'row', padding: 3 },
+  logicOption: {
+    minHeight: 44,
+    minWidth: 48,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  presetRow: { flexDirection: 'row', gap: 8, paddingVertical: 4, paddingRight: GRID_PAD },
+  presetCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    minHeight: 44,
+  },
+  presetLabel: {
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    fontSize: scale(12),
+  },
+  quickPickSubheader: {
+    fontWeight: '700',
+    letterSpacing: 0.9,
+    marginBottom: 8,
+    paddingHorizontal: 2,
+    textTransform: 'uppercase',
+    fontSize: scale(10),
+  },
+  quickPickChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    minHeight: 42,
+  },
+
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  chipText: { fontWeight: '700' },
+  chipTextExcluded: { textDecorationLine: 'line-through' },
+  chipTextUpper: {
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    paddingEnd: 2,
+    textTransform: 'uppercase',
+    fontSize: scale(10),
+  },
+  hScroll: { marginBottom: 4 },
+  hChipRow: { flexDirection: 'row', gap: 8, paddingVertical: 4, paddingRight: GRID_PAD },
+
+  moreFiltersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+    minHeight: 48,
+  },
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 4,
+    minHeight: 48,
+  },
+
+  rangeLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: scale(12),
+    gap: 12,
+  },
+  rangeReadout: {
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    fontSize: scale(11),
+  },
+
+  validationText: { flex: 1 },
+
+  stickyFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: GRID_PAD,
+    paddingTop: scale(12),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    zIndex: 20,
+  },
+  validationBannerFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  actionRow: { flexDirection: 'row', gap: 12 },
+  resetBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 48,
+  },
+  searchBtn: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    minHeight: 48,
+  },
+  // Shared label styling for the two footer actions (Reset / Search). Now that
+  // both are text-only, the button's own justifyContent centres the label — no
+  // flex:1 width hack needed to balance a vanished icon.
+  actionBtnText: {
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+  },
+  searchBtnLoader: {
+    borderRadius: 8,
+    height: 16,
+    overflow: 'hidden',
+    width: 16,
+  },
+
+  stateBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  stateEyebrow: {
+    fontWeight: '700',
+    letterSpacing: 2,
+    marginBottom: 8,
+    paddingEnd: 3,
+    textTransform: 'uppercase',
+  },
+  stateIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+
+  resultsSection: { marginBottom: 32 },
+  resultsHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: scale(20),
+    gap: 12,
+  },
+  resultsHeaderBadges: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: scale(4) },
+  countBadge: { paddingHorizontal: 12, paddingVertical: 5 },
+  enrichmentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  enrichmentDot: {
+    borderRadius: 7,
+    height: 14,
+    width: 14,
+  },
+
+  gridCard: { width: GRID_COL_W },
+  resultsGrid: {
+    paddingHorizontal: 0,
+  },
+  // 2-up poster rows in the FlatList: one GRID_GAP between the columns and one
+  // below each row, matching the old PosterGrid `gap`. Each card is a fixed
+  // GRID_COL_W, so a lone trailing item stays left-aligned (no spacer needed).
+  gridColumnWrapper: {
+    gap: GRID_GAP,
+    marginBottom: GRID_GAP,
+  },
+  omdbMetaLine: { marginTop: 4, fontWeight: '600', letterSpacing: 0.2 },
+
+  loadMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginTop: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 48,
+  },
+  loadMoreErrorBtn: { paddingHorizontal: 12 },
+  endText: {
+    textAlign: 'center',
+    marginTop: 24,
+    letterSpacing: 1,
+    paddingEnd: 2,
+    textTransform: 'uppercase',
+    fontSize: scale(10),
+    fontWeight: '700',
+  },
+  streamingTextButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+  },
+  streamingTextLabel: {
+    letterSpacing: 0.2,
+  },
+  streamingClearButton: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+  },
+});

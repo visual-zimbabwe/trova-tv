@@ -1,0 +1,18 @@
+{
+  "avoid": [
+    "Netflix",
+    "HBO Max",
+    "BBC iPlayer"
+  ],
+  "domains": [
+    "netflix.com",
+    "hbomax.com",
+    "max.com",
+    "bbc.co.uk/iplayer"
+  ],
+  "colors": [
+    "#E50914",
+    "#002BE7",
+    "#FF4C98"
+  ]
+}

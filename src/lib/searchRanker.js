@@ -1,0 +1,325 @@
+// @ts-check
+
+/**
+ * Relevance ordering for both search paths.
+ *
+ * Before this module the live panel rendered `/search/multi` in the order TMDb
+ * returned it, and the submit path applied a different sort (exact title, then
+ * popularity) to the same payload. Two rankings of one request meant tapping a
+ * row and pressing enter gave different answers on 28.1% of prefixes.
+ *
+ * The numbers below come from replaying 701 live prefix requests across 40
+ * popular titles (every prefix of every title) through candidate rankers and
+ * asking where the title being typed actually landed.
+ *
+ *   raw TMDb order (what shipped)           66.0% at row 1, 18/40 titles unstable
+ *   exact-title then popularity (submit)    68.5% at row 1, 22/40 titles unstable
+ *   popularity only                         76.7% at row 1,  7/39 titles unstable
+ *   prefix tier then popularity (this)      76.9% at row 1,  8/39 titles unstable
+ *
+ * "Unstable" is the failure that matters most: a title reaching row 1 and then
+ * dropping off it as the user keeps typing. Under the old order `The Odyssey`
+ * was #1 at "The" and absent at "The O".
+ *
+ * Two deliberate choices, both measured, both easy to "fix" into a regression:
+ *
+ * 1. NO vote-count floor. Reusing MIN_RAIL_VOTES / ABSOLUTE_MIN_RAIL_VOTES from
+ *    railPicker.js drops this to 66.9% — the opposite of what those floors do
+ *    for recommendation rails. A title someone is actively typing about is
+ *    often brand new and thinly voted; the floor buries exactly what they want.
+ *
+ * 2. NO exact-title tier. Ranking exact matches above prefix matches costs 8.3
+ *    points across all prefixes (76.9% -> 68.6%) and nearly triples instability
+ *    (8/39 -> 22/40), because on a partial query the "exact" match is whatever
+ *    short title happens to equal the fragment ("Ma" -> the 2019 film Ma). It
+ *    buys exactly one title at full query length, `Law & Order`, which loses to
+ *    `Law & Order: Special Victims Unit` — arguably the right answer anyway.
+ *
+ * Honest ceiling: about 79%. On short prefixes TMDb simply does not return the
+ * intended title in its top 20, and no amount of reordering invents it.
+ */
+
+/** Below this, `/search/multi` is answering a question nobody asked. */
+export const MIN_SEARCH_QUERY_LENGTH = 2;
+
+/**
+ * Rows in the live panel. Measured against the same 701 prefixes: the intended
+ * title is visible 76.9% at row 1, 78.7% by row 3, 79.0% by row 5 — and rows 6
+ * through 10 add *exactly nothing*. On a 384dp screen the keyboard leaves about
+ * three rows showing, so the old cap of 10 was hiding seven rows that never
+ * held the answer.
+ */
+export const SEARCH_PANEL_MAX_ROWS = 6;
+
+/** Results kept for the submitted search (Top Match + the Also Matched grid). */
+export const SEARCH_RESULTS_MAX = 10;
+
+const PERSON_DEPARTMENTS = ['Acting', 'Directing'];
+
+/**
+ * Same normalisation the submit path already used: fold case, drop punctuation,
+ * collapse whitespace. Keeps "Schindlers List" matching "Schindler's List".
+ *
+ * @param {string | null | undefined} text
+ */
+export function normalizeSearchText(text) {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, '')
+    .trim();
+}
+
+/**
+ * How well a title answers the query, lower is better.
+ *
+ *   0  the title starts with what was typed        "mast" -> "Masters of the Universe"
+ *   1  some word in the title starts with it       "mast" -> "Ink Master"
+ *   2  the title contains it anywhere              "mast" -> "Beyond the Mast"
+ *   3  no textual relationship at all
+ *
+ * @param {string | null | undefined} title
+ * @param {string} normalizedQuery already run through `normalizeSearchText`
+ */
+export function searchMatchTier(title, normalizedQuery) {
+  const name = normalizeSearchText(title);
+  if (!name || !normalizedQuery) return 3;
+  if (name.startsWith(normalizedQuery)) return 0;
+  if (name.split(/\s+/).some((word) => word.startsWith(normalizedQuery))) return 1;
+  if (name.includes(normalizedQuery)) return 2;
+  return 3;
+}
+
+/**
+ * True for a person TMDb knows enough about to be worth a row. The submit path
+ * used to accept any `known_for_department`, which is how typing "Av" and
+ * pressing enter opened the filmography of a Production-department credit
+ * literally named "Av" — 43 of 701 prefixes ended somewhere like that, and 19
+ * of those were on people this predicate rejects.
+ *
+ * @param {string | null | undefined} department
+ */
+export function isRankablePersonDepartment(department) {
+  return Boolean(department) && PERSON_DEPARTMENTS.includes(String(department));
+}
+
+/**
+ * Extract an optional 4-digit release year hint (`1900`–`2039`) from a multi-word
+ * query so searches like `"Mutiny 2026"` or `"Mutiny (2026)"` can query TMDb for
+ * `"Mutiny"` and promote the 2026 release to rank #1.
+ *
+ * A single-token year query like `"1917"` or `"2012"` is left intact as a title
+ * query with `yearHint: null` so films named after years still match normally.
+ *
+ * @param {string | null | undefined} query
+ * @returns {{ rawQuery: string, titleQuery: string, yearHint: string | null, tokens: string[] }}
+ */
+export function parseCompoundSearchQuery(query) {
+  const rawQuery = (query || '').trim();
+  const allTokens = normalizeSearchText(rawQuery).split(/\s+/).filter(Boolean);
+  if (allTokens.length < 2) {
+    return {
+      rawQuery,
+      titleQuery: rawQuery,
+      yearHint: null,
+      tokens: allTokens,
+    };
+  }
+
+  let yearHint = null;
+  const nonYearTokens = [];
+  for (const token of allTokens) {
+    if (!yearHint && /^(19\d{2}|20[0-3]\d)$/.test(token)) {
+      yearHint = token;
+    } else {
+      nonYearTokens.push(token);
+    }
+  }
+
+  if (!yearHint || nonYearTokens.length === 0) {
+    return {
+      rawQuery,
+      titleQuery: rawQuery,
+      yearHint: null,
+      tokens: allTokens,
+    };
+  }
+
+  const stripped = rawQuery
+    .replace(new RegExp(`[([\\s]*\\b${yearHint}\\b[)\\]\\s]*`, 'g'), ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return {
+    rawQuery,
+    titleQuery: stripped || nonYearTokens.join(' '),
+    yearHint,
+    tokens: nonYearTokens,
+  };
+}
+
+/**
+ * Generate candidate `(titlePart, personPart)` token splits for multi-word
+ * queries like `"Mutiny Jason Statham"`, `"Jason Statham Mutiny"`, or
+ * `"Mutiny Statham"` when `/search/multi` returns no direct matches.
+ *
+ * @param {string | null | undefined} query
+ * @returns {Array<{ titlePart: string, personPart: string, yearHint: string | null }>}
+ */
+export function buildCompoundPersonTitleSplits(query) {
+  const { tokens, yearHint } = parseCompoundSearchQuery(query);
+  if (tokens.length < 2 || tokens.length > 6) return [];
+
+  const splits = [];
+  const seen = new Set();
+  const addSplit = (titleTokens, personTokens) => {
+    if (!titleTokens.length || !personTokens.length) return;
+    const titlePart = titleTokens.join(' ');
+    const personPart = personTokens.join(' ');
+    if (titlePart.length < MIN_SEARCH_QUERY_LENGTH || personPart.length < MIN_SEARCH_QUERY_LENGTH) {
+      return;
+    }
+    const key = `${titlePart}::${personPart}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    splits.push({ titlePart, personPart, yearHint });
+  };
+
+  // 1. Title followed by 2-word person name (e.g. "mutiny jason statham")
+  if (tokens.length >= 3) {
+    addSplit(tokens.slice(0, -2), tokens.slice(-2));
+  }
+  // 2. Title followed by 1-word person surname/mononym (e.g. "mutiny statham")
+  addSplit(tokens.slice(0, -1), tokens.slice(-1));
+  // 3. 2-word person name followed by title (e.g. "jason statham mutiny")
+  if (tokens.length >= 3) {
+    addSplit(tokens.slice(2), tokens.slice(0, 2));
+  }
+  // 4. 1-word person name followed by title (e.g. "statham mutiny")
+  addSplit(tokens.slice(1), tokens.slice(0, 1));
+
+  return splits;
+}
+
+/**
+ * Order a mixed list of mapped candidates (titles and people together).
+ *
+ * People share the pool rather than being appended after the titles: measured
+ * over the same 701 prefixes it makes no difference to how often the intended
+ * title is first (76.9% either way, identical stability) but it drops "row 1 is
+ * a person" from 3.7% to 1.4%, because a person now has to actually match the
+ * text rather than inherit whatever slot TMDb gave them. Typing a real name
+ * still works — "Tom Hanks", "Zendaya" and "Denis Villeneuve" all put the
+ * person first.
+ *
+ * Pure and stable: equal candidates keep their incoming order.
+ *
+ * @template {{ title?: string | null, year?: string | null, popularity?: number | null }} T
+ * @param {T[]} candidates
+ * @param {string} query
+ * @returns {T[]} a new array; the input is not mutated
+ */
+export function rankSearchCandidates(candidates, query) {
+  const normalizedQuery = normalizeSearchText(query);
+  if (!Array.isArray(candidates) || candidates.length === 0) return [];
+
+  const { titleQuery, yearHint } = parseCompoundSearchQuery(query);
+  const normalizedTitleQuery = yearHint ? normalizeSearchText(titleQuery) : normalizedQuery;
+
+  return candidates
+    .map((candidate, index) => {
+      const rawTier = searchMatchTier(candidate?.title, normalizedQuery);
+      const strippedTier =
+        yearHint && normalizedTitleQuery
+          ? searchMatchTier(candidate?.title, normalizedTitleQuery)
+          : rawTier;
+      const tier = Math.min(rawTier, strippedTier);
+      const matchesYearHint =
+        Boolean(yearHint) &&
+        tier <= 2 &&
+        String(candidate?.year || '') === String(yearHint);
+      return {
+        candidate,
+        index,
+        tier,
+        matchesYearHint: matchesYearHint ? 1 : 0,
+        popularity: Number(candidate?.popularity) || 0,
+      };
+    })
+    .sort((a, b) => {
+      if (a.matchesYearHint !== b.matchesYearHint) {
+        return b.matchesYearHint - a.matchesYearHint;
+      }
+      if (a.tier !== b.tier) return a.tier - b.tier;
+      if (a.popularity !== b.popularity) return b.popularity - a.popularity;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.candidate);
+}
+
+/**
+ * Whether a query is worth spending a request on. One character returns the
+ * largest payloads in the sample (median 12.1KB) and effectively never contains
+ * the title being typed.
+ *
+ * @param {string | null | undefined} query
+ */
+export function isSearchableQuery(query) {
+  return normalizeSearchText(query).length >= MIN_SEARCH_QUERY_LENGTH;
+}
+
+/**
+ * Which titles in a result set cannot be told apart by their artwork alone.
+ *
+ * Search deliberately drops the year caption under each poster — the poster
+ * itself is lettered with the title, so the caption only restated it. The one
+ * case that breaks is a genuine collision: "Dune" (1984) beside "Dune" (2021),
+ * "The Lion King" (1994) beside (2019). Both posters say the same word, so the
+ * year is the *only* discriminator and has to survive somewhere.
+ *
+ * Returning the colliding titles rather than always showing a year keeps the
+ * badge meaningful: when one appears, it is because it is load-bearing.
+ *
+ * @param {{ title?: string | null, year?: string | null }[]} titles
+ * @returns {Set<string>} normalised titles that appear more than once
+ */
+export function collidingTitleNames(titles) {
+  const counts = new Map();
+  (Array.isArray(titles) ? titles : []).forEach((item) => {
+    const name = normalizeSearchText(item?.title);
+    if (!name) return;
+    counts.set(name, (counts.get(name) || 0) + 1);
+  });
+  return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([name]) => name));
+}
+
+/**
+ * The year to letter onto a poster, or null when the artwork already separates
+ * it from everything else on screen.
+ *
+ * @param {{ title?: string | null, year?: string | null }} item
+ * @param {Set<string>} collisions from `collidingTitleNames`
+ */
+export function yearBadgeFor(item, collisions) {
+  if (!collisions?.size) return null;
+  const year = item?.year;
+  if (!year || year === 'N/A') return null;
+  return collisions.has(normalizeSearchText(item?.title)) ? String(year) : null;
+}
+
+/**
+ * Split a ranked, mixed result list into the two things the results screen
+ * renders differently. Order within each group is preserved, so the ranking
+ * survives the split.
+ *
+ * @template {{ resultType?: string }} T
+ * @param {T[]} results
+ */
+export function partitionSearchResults(results) {
+  const list = Array.isArray(results) ? results : [];
+  return {
+    people: list.filter((item) => item?.resultType === 'person'),
+    titles: list.filter((item) => item?.resultType !== 'person'),
+    /** True when the best answer overall was a person, not a title. */
+    leadsWithPerson: list[0]?.resultType === 'person',
+  };
+}

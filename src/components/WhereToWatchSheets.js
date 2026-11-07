@@ -1,0 +1,455 @@
+// Sheet contents for the watchlist Where-to-Watch filter: country picker,
+// service picker, and collection scope picker. Each component owns its local
+// UI state and reports the final choice through a callback, so the sheets stay
+// correct even though StackBottomSheet snapshots its content when shown.
+
+import React, { useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme/ThemeProvider';
+import { GOLD_ACCENT, GOLD_DIM } from '../theme/programme';
+import { ProgrammeBadge } from './ProgrammeBadge';
+import { fetchWatchProviderRegions, SERVICE_FALLBACK_COLORS } from '../lib/tmdb';
+import { FALLBACK_WATCH_REGIONS, WHERE_TO_WATCH_SERVICES } from '../lib/whereToWatch';
+import { resolveLanguageLabel } from '../lib/languages';
+
+function OptionRow({ label, sublabel, selected, onPress, leading, accessibilityLabel }) {
+  const { theme } = useTheme();
+  const { colors, typography } = theme;
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.optionRow,
+        selected && styles.optionRowSelected,
+      ]}
+      activeOpacity={0.72}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || label}
+      accessibilityState={{ selected }}
+    >
+      {leading}
+      <View style={styles.optionCopy}>
+        <Text
+          style={[
+            styles.optionLabel,
+            {
+              color: selected ? GOLD_ACCENT : colors.onSurface,
+              ...typography.bodyLg,
+              fontWeight: selected ? '700' : '500',
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        {!!sublabel && (
+          <Text
+            style={[styles.optionSublabel, { color: colors.onSurfaceVariant, ...typography.labelSm }]}
+            numberOfLines={1}
+          >
+            {sublabel}
+          </Text>
+        )}
+      </View>
+      {selected ? (
+        <Ionicons name="checkmark" size={20} color={GOLD_ACCENT} />
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
+export function WhereToWatchCountrySheet({ selectedCode, onSelect, allowAll = false }) {
+  const { theme } = useTheme();
+  const { colors, typography, radii } = theme;
+  const [regions, setRegions] = useState(null);
+  const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    fetchWatchProviderRegions()
+      .then((fetched) => {
+        if (alive && fetched.length) setRegions(fetched);
+      })
+      .catch(() => {
+        // Fallback list is already on screen; nothing to do.
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const visibleRegions = useMemo(() => {
+    const base = regions || FALLBACK_WATCH_REGIONS;
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) return base;
+    return base.filter(
+      (region) =>
+        region.label.toLowerCase().includes(trimmed) || region.code.toLowerCase() === trimmed,
+    );
+  }, [regions, query]);
+
+  return (
+    <View style={styles.sheetContent}>
+      <View style={styles.searchBox}>
+        <Ionicons name="search-outline" size={18} color={colors.onSurfaceVariant} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search countries"
+          placeholderTextColor={colors.onSurfaceVariant}
+          style={[styles.searchInput, { color: colors.onSurface, ...typography.bodyLg }]}
+          autoCorrect={false}
+          accessibilityLabel="Search countries"
+        />
+        {query.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setQuery('')}
+            accessibilityRole="button"
+            accessibilityLabel="Clear country search"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {allowAll && !query.trim() ? (
+        <OptionRow
+          label="All Countries"
+          sublabel="Show everything in your library"
+          selected={!selectedCode}
+          onPress={() => onSelect({ code: null, label: 'All countries' })}
+          accessibilityLabel="Show titles from all countries"
+        />
+      ) : null}
+
+      {visibleRegions.map((region) => (
+        <OptionRow
+          key={region.code}
+          label={region.label}
+          selected={region.code === selectedCode}
+          onPress={() => onSelect(region)}
+          accessibilityLabel={`Filter availability for ${region.label}`}
+        />
+      ))}
+
+      {visibleRegions.length === 0 && (
+        <Text style={[styles.emptyText, { color: colors.onSurfaceVariant, ...typography.bodyMd }]}>
+          No countries match that search.
+        </Text>
+      )}
+    </View>
+  );
+}
+
+export function WhereToWatchServiceSheet({ selectedKey, onSelect }) {
+  const { theme } = useTheme();
+  const { colors, typography } = theme;
+
+  return (
+    <View style={styles.sheetContent}>
+      <OptionRow
+        label="Any Service"
+        sublabel="Match titles on any tracked streaming service"
+        selected={!selectedKey}
+        onPress={() => onSelect(null)}
+        accessibilityLabel="Match any streaming service"
+      />
+      {WHERE_TO_WATCH_SERVICES.map((service) => (
+        <OptionRow
+          key={service.key}
+          label={service.label}
+          selected={service.key === selectedKey}
+          onPress={() => onSelect(service.key)}
+          accessibilityLabel={`Only show titles on ${service.label}`}
+        />
+      ))}
+      <Text style={[styles.footnote, { color: colors.onSurfaceVariant, ...typography.labelSm }]}>
+        Availability data by TMDB · JustWatch. Rent and buy options are not included.
+      </Text>
+    </View>
+  );
+}
+
+export function WhereToWatchLanguageSheet({
+  languages = [],
+  selectedCode = null,
+  onSelect,
+  totalCount = 0,
+}) {
+  const { theme } = useTheme();
+  const { colors, typography } = theme;
+  const [query, setQuery] = useState('');
+
+  const normalizedLanguages = useMemo(() => {
+    return (languages || []).map((lang) => {
+      const resolvedLabel =
+        lang.isOther || lang.code === 'other'
+          ? 'Other'
+          : resolveLanguageLabel(lang.code) || lang.label;
+      return {
+        ...lang,
+        label: resolvedLabel,
+      };
+    });
+  }, [languages]);
+
+  const visibleLanguages = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) return normalizedLanguages;
+    return normalizedLanguages.filter(
+      (lang) =>
+        lang.label.toLowerCase().includes(trimmed) ||
+        lang.code.toLowerCase().includes(trimmed),
+    );
+  }, [normalizedLanguages, query]);
+
+  return (
+    <View style={styles.sheetContent}>
+      {languages.length > 5 && (
+        <View style={styles.searchBox}>
+          <Ionicons name="search-outline" size={18} color={colors.onSurfaceVariant} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search languages"
+            placeholderTextColor={colors.onSurfaceVariant}
+            style={[styles.searchInput, { color: colors.onSurface, ...typography.bodyLg }]}
+            autoCorrect={false}
+            accessibilityLabel="Search languages"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear language search"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={18} color={colors.onSurfaceVariant} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      {!query.trim() && (
+        <OptionRow
+          label="All Languages"
+          sublabel={
+            totalCount > 0
+              ? `Show all ${totalCount} saved ${totalCount === 1 ? 'title' : 'titles'}`
+              : 'Show everything in your library'
+          }
+          selected={!selectedCode}
+          onPress={() => onSelect(null)}
+          accessibilityLabel="Show titles in all languages"
+        />
+      )}
+
+      {visibleLanguages.map((lang) => {
+        const isSelected = selectedCode === lang.code;
+        const sublabel = lang.isOther
+          ? `${lang.count} ${lang.count === 1 ? 'title' : 'titles'} with no language`
+          : `${lang.count} ${lang.count === 1 ? 'title' : 'titles'} in library`;
+
+        return (
+          <OptionRow
+            key={lang.code}
+            label={lang.label}
+            sublabel={sublabel}
+            selected={isSelected}
+            onPress={() => onSelect(lang)}
+            accessibilityLabel={`Filter to ${lang.label} titles (${lang.count})`}
+          />
+        );
+      })}
+
+      {visibleLanguages.length === 0 && languages.length > 0 && (
+        <Text style={[styles.emptyText, { color: colors.onSurfaceVariant, ...typography.bodyMd }]}>
+          No languages match that search.
+        </Text>
+      )}
+
+      {languages.length === 0 && (
+        <Text style={[styles.emptyText, { color: colors.onSurfaceVariant, ...typography.bodyMd }]}>
+          No saved titles in your library yet.
+        </Text>
+      )}
+    </View>
+  );
+}
+
+export function WhereToWatchCollectionsSheet({ collections, selectedIds, onApply }) {
+  const { theme } = useTheme();
+  const { colors, typography, radii } = theme;
+  const allIds = useMemo(() => collections.map((collection) => collection.id), [collections]);
+  const [selected, setSelected] = useState(
+    () => new Set(selectedIds?.length ? selectedIds : allIds),
+  );
+
+  const allSelected = selected.size === allIds.length;
+
+  const toggle = (collectionId) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(collectionId)) {
+        next.delete(collectionId);
+      } else {
+        next.add(collectionId);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <View style={styles.sheetContent}>
+      <OptionRow
+        label="All Collections"
+        sublabel="Search across your entire library"
+        selected={allSelected}
+        onPress={() => setSelected(new Set(allIds))}
+        accessibilityLabel="Search across all collections"
+        leading={
+          <ProgrammeBadge
+            icon="albums-outline"
+            iconSize={16}
+            iconColor={GOLD_ACCENT}
+            variant="subtle"
+            size="lg"
+            shape="circle"
+            style={styles.leadingBadge}
+          />
+        }
+      />
+      {collections.map((collection) => (
+        <OptionRow
+          key={collection.id}
+          label={collection.name}
+          selected={selected.has(collection.id)}
+          onPress={() => toggle(collection.id)}
+          accessibilityLabel={`${selected.has(collection.id) ? 'Exclude' : 'Include'} ${collection.name}`}
+          leading={
+            <ProgrammeBadge
+              icon={collection.icon || 'albums-outline'}
+              iconSize={16}
+              iconColor={GOLD_ACCENT}
+              variant="subtle"
+              size="lg"
+              shape="circle"
+              style={styles.leadingBadge}
+            />
+          }
+        />
+      ))}
+
+      <TouchableOpacity
+        style={[
+          styles.applyButton,
+          {
+            backgroundColor: selected.size ? GOLD_ACCENT : colors.surfaceContainerHigh,
+            borderRadius: radii.full,
+          },
+        ]}
+        disabled={!selected.size}
+        onPress={() => onApply(allSelected ? null : Array.from(selected))}
+        accessibilityRole="button"
+        accessibilityLabel="Apply collection selection"
+        accessibilityState={{ disabled: !selected.size }}
+      >
+        <Text
+          style={[
+            styles.applyButtonText,
+            { color: selected.size ? '#1C1710' : colors.onSurfaceVariant, ...typography.labelSm },
+          ]}
+        >
+          {selected.size ? `Search ${allSelected ? 'All' : selected.size} Collection${allSelected || selected.size !== 1 ? 's' : ''}` : 'Pick at least one'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  sheetContent: {
+    gap: 4,
+    paddingBottom: 8,
+  },
+  searchBox: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 22,
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  searchInput: {
+    flex: 1,
+    minHeight: 40,
+    padding: 0,
+  },
+  optionRow: {
+    alignItems: 'center',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  optionRowSelected: {
+    backgroundColor: 'rgba(212, 175, 55, 0.10)',
+  },
+  optionCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  optionLabel: {
+    fontWeight: '600',
+  },
+  optionSublabel: {
+    fontWeight: '500',
+    letterSpacing: 0.3,
+    marginTop: 2,
+    opacity: 0.8,
+  },
+  leadingBadge: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(212, 175, 55, 0.12)',
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  leadingBadgeText: {
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  serviceDot: {
+    borderRadius: 6,
+    height: 12,
+    width: 12,
+  },
+  emptyText: {
+    paddingVertical: 16,
+    textAlign: 'center',
+  },
+  footnote: {
+    marginTop: 10,
+    textAlign: 'center',
+    opacity: 0.7,
+  },
+  applyButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    minHeight: 50,
+  },
+  applyButtonText: {
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+});

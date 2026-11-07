@@ -1,0 +1,20 @@
+{
+  "avoid": [
+    "Netflix",
+    "HBO Max",
+    "BBC iPlayer"
+  ],
+  "app_store": {
+    "name": "Trova TV: Cinema & Series Hub",
+    "subtitle": "Where to Watch, Awards & 4K",
+    "promotional_text": "Explore 87 global film and television award ceremonies, 470+ film franchises, multi-critic ratings, and 10-foot smart TV discovery.",
+    "description": "Trova TV turns your living-room television into a unified cinema programme and discovery studio.\n\nBuilt for the 10-foot D-pad experience, Trova TV brings together official regional streaming availability, verified multi-critic ratings (IMDb, Rotten Tomatoes, Metacritic), 87 global film and television award ceremonies, 470+ movie franchises, and instant landscape playback with automatic English subtitles.\n\nKey Features:\n- Widescreen 16:9 spotlight billboard with zero intrusive auto-play audio\n- Multi-facet Discover Studio: filter by genre, release decade, language, and rating\n- 87 Global Film and Television Honors including Academy Awards, Cannes, BAFTA, and Emmy winners\n- Complete TV Season and Episode guide with air dates and runtime\n- Local-first Watchlist and custom collections with zero account lock-in",
+    "keywords": "movies,watchlist,streaming,guide,discover,subtitles,television,films,collections,4k",
+    "whats_new": "New 10-foot Android TV interface with D-pad navigation, 87 global award ceremonies, and dual-ABI playback engine."
+  },
+  "google_play": {
+    "title": "Trova TV: Cinema & Series Hub",
+    "short_description": "10-foot TV cinema guide with multi-critic scores, 87 awards, and streaming hub.",
+    "full_description": "Trova TV turns your Android TV or Google TV into a unified cinema programme and discovery studio.\n\nBuilt for the 10-foot remote control experience, Trova TV unites regional streaming availability, verified multi-critic ratings, 87 global film and television award ceremonies, 470+ movie franchises, and instant landscape playback with automatic English subtitles.\n\n100% local-first with zero ads and no subscription wall."
+  }
+}

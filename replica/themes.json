@@ -1,0 +1,54 @@
+{
+  "themes": [
+    {
+      "id": "autoplay-noise",
+      "label": "Intrusive auto-playing trailer audio while browsing",
+      "kind": "complaint",
+      "patterns": ["autoplay", "auto-play", "trailer", "loud", "mute", "preview"]
+    },
+    {
+      "id": "fragmentation-services",
+      "label": "Catalog fragmentation across too many streaming apps",
+      "kind": "complaint",
+      "patterns": ["fragmented", "subscriptions", "services", "apps", "catalog", "switch", "where to watch"]
+    },
+    {
+      "id": "missing-real-ratings",
+      "label": "Fake % match scores instead of real IMDb / Rotten Tomatoes ratings",
+      "kind": "complaint",
+      "patterns": ["rotten tomatoes", "imdb", "rating", "stars", "match", "score", "reviews"]
+    },
+    {
+      "id": "slow-bloated-tv-ui",
+      "label": "Sluggish smart TV navigation, lag, and crashes",
+      "kind": "complaint",
+      "patterns": ["slow", "lag", "crash", "bug", "ui", "navigation", "freeze", "buffering"]
+    },
+    {
+      "id": "subtitles-broken",
+      "label": "Missing, out-of-sync, or hard-to-read TV subtitles",
+      "kind": "complaint",
+      "patterns": ["subtitle", "subtitles", "captions", "sync", "english"]
+    },
+    {
+      "id": "price-ads-locks",
+      "label": "Price hikes, ad tiers, and household IP blocks",
+      "kind": "complaint",
+      "patterns": ["price", "ads", "commercials", "household", "expensive", "pay", "cancel"]
+    },
+    {
+      "id": "better-filtering",
+      "label": "Want real genre, decade, rating, and award filtering",
+      "kind": "request",
+      "patterns": ["filter", "sort", "search", "find", "genre", "list", "watchlist"]
+    }
+  ],
+  "request_patterns": [
+    "wish",
+    "please add",
+    "bring back",
+    "should have",
+    "would be nice",
+    "need a way"
+  ]
+}
