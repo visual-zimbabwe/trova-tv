@@ -1,0 +1,687 @@
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useTheme } from '../theme/ThemeProvider';
+import { ProgrammeBadge } from './ProgrammeBadge';
+import { WATCHLIST_STATUSES } from '../lib/watchlistModel';
+
+// Show the filter field only once the list is long enough to warrant hunting.
+const SEARCH_THRESHOLD = 6;
+
+/**
+ * The destination picker behind the bookmark. Every save flows through here —
+ * there is no instant save — so it is built for speed: a "Recent" quick-pick
+ * row, a search field when lists pile up, lists as the hero with status as a
+ * secondary detail, and a pinned primary action. Nothing is committed until the
+ * user picks; `committed` reflects whether the row now exists in the library.
+ */
+export function WatchlistCollectionsSheet({
+  item,
+  collections,
+  committed = false,
+  recentCollectionIds = [],
+  onCreateCollection,
+  onToggleCollection,
+  onEditCollection,
+  onSetStatus,
+  onSave,
+  onRemove,
+  onClose,
+}) {
+  const { theme } = useTheme();
+  const { colors, typography, radii, spacing } = theme;
+  const [name, setName] = useState('');
+  const [query, setQuery] = useState('');
+  const selectedCollectionIds = new Set(item?.collectionIds || []);
+
+  const showSearch = collections.length > SEARCH_THRESHOLD;
+
+  const filteredCollections = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return collections;
+    return collections.filter((collection) => collection.name.toLowerCase().includes(q));
+  }, [collections, query]);
+
+  // Recent lists the user hasn't already filed this title into — a one-tap path
+  // pre-commit so "pick every time" doesn't mean "scroll every time".
+  const recentCollections = useMemo(() => {
+    if (committed) return [];
+    return recentCollectionIds
+      .map((id) => collections.find((collection) => collection.id === id))
+      .filter((collection) => collection && !selectedCollectionIds.has(collection.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [committed, recentCollectionIds, collections, item?.collectionIds]);
+
+  const handleCreate = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onCreateCollection(trimmed);
+    setName('');
+  };
+
+  return (
+    <View style={styles.root}>
+      <ScrollView
+        style={styles.scroll}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={styles.scrollContent}
+      >
+        <Text
+          style={[
+            styles.hint,
+            { color: colors.onSurfaceVariant, ...typography.bodyMd },
+          ]}
+        >
+          {committed
+            ? 'Manage where this lives. Lists can overlap.'
+            : 'Choose where this goes. Pick a list or status to save it.'}
+        </Text>
+
+        {/* Recent — fast pre-commit path */}
+        {recentCollections.length > 0 && (
+          <View style={styles.block}>
+            <Text
+              style={[styles.groupLabel, { color: colors.onSurfaceVariant, ...typography.labelSm }]}
+            >
+              Recent
+            </Text>
+            <View style={styles.recentRow}>
+              {recentCollections.map((collection) => (
+                <TouchableOpacity
+                  key={collection.id}
+                  style={[
+                    styles.recentChip,
+                    {
+                      backgroundColor: 'rgba(212, 175, 55, 0.12)',
+                      borderRadius: radii.full,
+                    },
+                  ]}
+                  onPress={() => onToggleCollection(collection.id)}
+                  activeOpacity={0.82}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Save to ${collection.name}`}
+                >
+                  <Text
+                    style={[styles.recentChipText, { color: colors.onSurface, ...typography.labelSm }]}
+                    numberOfLines={1}
+                  >
+                    {collection.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* Lists — the hero */}
+        <View style={styles.block}>
+          <Text
+            style={[styles.groupLabel, { color: colors.onSurfaceVariant, ...typography.labelSm }]}
+          >
+            Add to a list
+          </Text>
+
+          {showSearch && (
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={16} color={colors.onSurfaceVariant} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search lists"
+                placeholderTextColor={colors.onSurfaceVariant}
+                style={[styles.searchInput, { color: colors.onSurface, ...typography.bodyMd }]}
+                returnKeyType="search"
+              />
+              {query.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setQuery('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear search"
+                >
+                  <Ionicons name="close-circle" size={16} color={colors.onSurfaceVariant} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          <View style={styles.categoryList}>
+            {filteredCollections.map((collection) => {
+              const isSelected = selectedCollectionIds.has(collection.id);
+              const locked = collection.immutable && isSelected;
+              return (
+                <TouchableOpacity
+                  key={collection.id}
+                  style={[
+                    styles.categoryOption,
+                    isSelected && styles.categoryOptionSelected,
+                  ]}
+                  activeOpacity={locked ? 1 : 0.72}
+                  onPress={() => {
+                    if (!locked) onToggleCollection(collection.id);
+                  }}
+                  onLongPress={() => {
+                    if (!collection.immutable && onEditCollection) {
+                      Haptics.selectionAsync();
+                      onEditCollection(collection);
+                    }
+                  }}
+                  delayLongPress={380}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={`${isSelected ? 'Remove from' : 'Add to'} ${collection.name}${!collection.immutable ? ', long-press to edit' : ''}`}
+                  accessibilityState={{ checked: isSelected, disabled: locked }}
+                >
+                  <View style={styles.categoryCopy}>
+                    <View style={styles.categoryLabelRow}>
+                      <Text
+                        style={[
+                          styles.categoryOptionTitle,
+                          {
+                            color: isSelected ? colors.primary : colors.onSurface,
+                            ...typography.bodyLg,
+                            fontWeight: isSelected ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {collection.name}
+                      </Text>
+                      {locked && (
+                        <ProgrammeBadge
+                          label="Default"
+                          variant="solid"
+                          size="xs"
+                          shape="rounded"
+                          backgroundColor={colors.primary + '22'}
+                          textColor={colors.primary}
+                          style={styles.currentBadge}
+                          textStyle={styles.currentBadgeText}
+                        />
+                      )}
+                    </View>
+                    {!!collection.description && (
+                      <Text
+                        style={[
+                          styles.categoryOptionDescription,
+                          { color: colors.onSurfaceVariant, ...typography.bodyMd },
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {collection.description}
+                      </Text>
+                    )}
+                  </View>
+                  {isSelected ? (
+                    <Ionicons
+                      name="checkmark"
+                      size={22}
+                      color={colors.primary}
+                    />
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+
+            {filteredCollections.length === 0 && (
+              <Text
+                style={[
+                  styles.emptyHint,
+                  { color: colors.onSurfaceVariant, ...typography.bodyMd },
+                ]}
+              >
+                No lists match “{query.trim()}”.
+              </Text>
+            )}
+          </View>
+
+          {/* Create a new list */}
+          <View style={styles.createCollectionBox}>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="New list name"
+              placeholderTextColor={colors.onSurfaceVariant}
+              style={[styles.collectionInput, { color: colors.onSurface, ...typography.bodyLg }]}
+              returnKeyType="done"
+              onSubmitEditing={handleCreate}
+            />
+            <TouchableOpacity
+              style={[
+                styles.createCollectionButton,
+                {
+                  backgroundColor: colors.primary,
+                  borderRadius: radii.full,
+                  opacity: name.trim() ? 1 : 0.5,
+                },
+              ]}
+              onPress={handleCreate}
+              disabled={!name.trim()}
+              accessibilityRole="button"
+              accessibilityLabel="Create list"
+              accessibilityState={{ disabled: !name.trim() }}
+            >
+              <Ionicons name="add" size={20} color={colors.onPrimary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Status — secondary detail */}
+        <View style={styles.block}>
+          <Text
+            style={[styles.groupLabel, { color: colors.onSurfaceVariant, ...typography.labelSm }]}
+          >
+            Status
+          </Text>
+          <View style={styles.statusRow}>
+            {WATCHLIST_STATUSES.filter((status) => status.id !== 'dropped').map((status) => {
+              const selected = item?.status === status.id;
+              return (
+                <TouchableOpacity
+                  key={status.id}
+                  style={[
+                    styles.statusChip,
+                    {
+                      backgroundColor: selected ? colors.primary : 'rgba(255, 255, 255, 0.08)',
+                      borderRadius: radii.full,
+                    },
+                  ]}
+                  onPress={() => onSetStatus(status.id)}
+                  activeOpacity={0.82}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Set status to ${status.label}`}
+                  accessibilityState={{ selected }}
+                >
+                  <Text
+                    style={[
+                      styles.statusChipText,
+                      { color: selected ? colors.onPrimary : colors.onSurface, ...typography.labelSm },
+                    ]}
+                  >
+                    {status.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Remove — de-emphasized and kept well clear of the primary action */}
+        {committed && (
+          <View style={styles.removeWrap}>
+            <View style={[styles.removeDivider, { backgroundColor: colors.outlineVariant + '30' }]} />
+            <TouchableOpacity
+              style={styles.removeLink}
+              activeOpacity={0.7}
+              onPress={onRemove}
+              accessibilityRole="button"
+              accessibilityLabel="Remove from library"
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Text style={[styles.removeLinkText, { color: colors.error, ...typography.labelSm }]}>
+                Remove from library
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Pinned primary action */}
+      <View style={[styles.footer, { borderTopColor: colors.outlineVariant + '30' }]}>
+        <TouchableOpacity
+          style={[
+            styles.primaryButton,
+            { backgroundColor: colors.primary, borderRadius: radii.full, marginTop: spacing[1] },
+          ]}
+          onPress={committed ? onClose : onSave}
+          accessibilityRole="button"
+          accessibilityLabel={committed ? 'Done' : 'Save to library'}
+        >
+          <Text
+            style={[styles.primaryButtonText, { color: colors.onPrimary, ...typography.labelLg }]}
+          >
+            {committed ? 'Done' : 'Save to Library'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    minHeight: 0,
+  },
+  scroll: {
+    flex: 1,
+    minHeight: 0,
+  },
+  scrollContent: {
+    gap: 18,
+    paddingBottom: 12,
+  },
+  hint: {
+    fontWeight: '500',
+  },
+  block: {
+    gap: 10,
+  },
+  groupLabel: {
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  recentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  recentChip: {
+    alignItems: 'center',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    maxWidth: '100%',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  recentChipText: {
+    flexShrink: 1,
+    fontWeight: '800',
+  },
+  searchBox: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 22,
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+  },
+  searchInput: {
+    flex: 1,
+    minHeight: 40,
+    padding: 0,
+  },
+  categoryList: {
+    gap: 4,
+  },
+  categoryOption: {
+    alignItems: 'center',
+    borderRadius: 14,
+    flexDirection: 'row',
+    gap: 14,
+    minHeight: 56,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  categoryOptionSelected: {
+    backgroundColor: 'rgba(212, 175, 55, 0.10)',
+  },
+  categoryCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  categoryOptionTitle: {
+    fontWeight: '600',
+  },
+  categoryOptionDescription: {
+    lineHeight: 18,
+  },
+  categoryLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  currentBadge: {
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  currentBadgeText: {
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  emptyHint: {
+    paddingVertical: 8,
+  },
+  createCollectionBox: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 22,
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
+    marginTop: 6,
+  },
+  collectionInput: {
+    flex: 1,
+    minHeight: 40,
+    padding: 0,
+  },
+  createCollectionButton: {
+    alignItems: 'center',
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  statusChipText: {
+    fontWeight: '800',
+  },
+  removeWrap: {
+    gap: 12,
+  },
+  removeDivider: {
+    height: StyleSheet.hairlineWidth,
+  },
+  removeLink: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  removeLinkText: {
+    fontWeight: '800',
+  },
+  footer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexShrink: 0,
+    paddingTop: 10,
+  },
+  primaryButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+  },
+  primaryButtonText: {
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  editSheetRoot: {
+    gap: 16,
+    paddingTop: 4,
+  },
+  editActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  deleteButton: {
+    alignItems: 'center',
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 16,
+    flex: 1,
+  },
+  deleteButtonText: {
+    fontWeight: '800',
+  },
+  saveButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+    paddingHorizontal: 22,
+    flex: 1,
+  },
+  saveButtonText: {
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+});
+
+/**
+ * Minimalist sheet to rename or delete an existing custom watchlist.
+ */
+export function EditCollectionSheet({
+  collection,
+  onSave,
+  onDelete,
+  onClose,
+}) {
+  const { theme } = useTheme();
+  const { colors, typography, radii } = theme;
+  const [name, setName] = useState(collection?.name || '');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const handleSave = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onSave?.(trimmed);
+  };
+
+  return (
+    <View style={styles.editSheetRoot}>
+      <Text style={[styles.hint, { color: colors.onSurfaceVariant, ...typography.bodyMd }]}>
+        Rename this watchlist or delete it. Saved titles will stay in your library.
+      </Text>
+
+      <View style={styles.block}>
+        <Text style={[styles.groupLabel, { color: colors.onSurfaceVariant, ...typography.labelSm }]}>
+          Watchlist Name
+        </Text>
+        <View style={styles.createCollectionBox}>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder="Watchlist name"
+            placeholderTextColor={colors.onSurfaceVariant}
+            style={[styles.collectionInput, { color: colors.onSurface, ...typography.bodyLg }]}
+            returnKeyType="done"
+            onSubmitEditing={handleSave}
+            autoFocus
+          />
+        </View>
+      </View>
+
+      <View style={styles.editActionsRow}>
+        {!confirmDelete ? (
+          <TouchableOpacity
+            style={[
+              styles.deleteButton,
+              {
+                borderColor: (colors.error || '#CF6679') + '55',
+                backgroundColor: (colors.error || '#CF6679') + '12',
+                borderRadius: radii.lg,
+              },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setConfirmDelete(true);
+            }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${collection?.name} watchlist`}
+          >
+            <Text
+              style={[
+                styles.deleteButtonText,
+                { color: colors.error || '#CF6679', ...typography.labelSm },
+              ]}
+            >
+              Delete
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[
+              styles.deleteButton,
+              {
+                backgroundColor: colors.error || '#CF6679',
+                borderColor: colors.error || '#CF6679',
+                borderRadius: radii.lg,
+              },
+            ]}
+            onPress={() => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              onDelete?.();
+            }}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Confirm delete ${collection?.name} watchlist`}
+          >
+            <Text
+              style={[
+                styles.deleteButtonText,
+                { color: colors.onError || '#FFFFFF', ...typography.labelSm },
+              ]}
+            >
+              Confirm Delete
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={[
+            styles.saveButton,
+            {
+              backgroundColor: name.trim() ? colors.primary : colors.surfaceContainerHigh,
+              borderRadius: radii.lg,
+              opacity: name.trim() ? 1 : 0.6,
+            },
+          ]}
+          disabled={!name.trim()}
+          onPress={() => {
+            Haptics.selectionAsync();
+            handleSave();
+          }}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel="Save watchlist name"
+        >
+          <Text
+            style={[
+              styles.saveButtonText,
+              {
+                color: name.trim() ? colors.onPrimary : colors.onSurfaceVariant,
+                ...typography.labelSm,
+              },
+            ]}
+          >
+            Save
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}

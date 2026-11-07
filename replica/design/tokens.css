@@ -1,0 +1,31 @@
+:root {
+  --color-bg: #040301;
+  --color-surface: #0D0B07;
+  --color-surface-elevated: #191610;
+  --color-surface-high: #25211B;
+  --color-border: #312D27;
+  --color-border-input: #858076;
+  --color-focus-ring: #D4A853;
+  --color-text: #F5EEE1;
+  --color-text-muted: #A39E94;
+  --color-accent: #D4A853;
+  --color-accent-dim: #B58E46;
+  --color-on-accent: #1A1204;
+  --color-danger: #FF6961;
+  --color-success: #4CD964;
+  --color-warning: #FFD60A;
+
+  --font-display: 'Manrope_800ExtraBold', system-ui, sans-serif;
+  --font-heading: 'Manrope_700Bold', system-ui, sans-serif;
+  --font-sans: 'Inter_400Regular', system-ui, sans-serif;
+  --font-label: 'Inter_600SemiBold', system-ui, sans-serif;
+  --font-wordmark: 'PlayfairDisplay_700Bold_Italic', Georgia, serif;
+
+  --overscan-x: 48px;
+  --overscan-y: 32px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --radius-pill: 9999px;
+}

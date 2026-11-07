@@ -1,0 +1,41 @@
+feature,area,priority,original,clone,notes
+Android TV Leanback launcher banner and landscape 10-foot activity,shell,must,yes,yes,LEANBACK_LAUNCHER intent filter + 320x180 banner + landscape lock
+Collapsible left navigation rail with D-pad focus and section switching,shell,must,yes,yes,10-foot sidebar with Search Home Movies Shows Collections Awards Discover Watchlist Downloads Settings
+Full-bleed 16:9 widescreen hero billboard with auto-rotating spotlight,home,must,yes,yes,Backdrop artwork with gradient scrim metadata pills and primary Play/Info/Watchlist CTAs
+Horizontal D-pad focusable content swimlanes with focus zoom and gold ring,home,must,yes,yes,Smooth horizontal scrolling on D-pad focus with 2.5px gold focus ring and 1.06x card scale
+Top 10 Trending on Trakt rail with oversized rank numerals,home,must,yes,yes,Netflix-style ranked swimlane powered by Trakt + TMDb fallback
+Home filter pills for Movies TV Shows Streaming Services Country and Language,home,must,yes,yes,Instant 10-foot facet filtering on the Home hub
+Full-screen 16:9 Title Detail view with IMDb Rotten Tomatoes and Metacritic scorecard,detail,must,yes,yes,Parallel TMDb + OMDb + Wikidata enrichment with multi-critic ratings
+Where to Watch streaming provider availability by country,detail,must,yes,yes,Regional streaming flatrate rent and buy provider badges
+1-click Play Best Stream and full Peer Release Picker with 4K HDR and seeder badges,playback,must,yes,yes,Preloads top swarm on detail open and launches landscape player with auto English subtitles
+Dual-ABI Go torrent streaming and subtitle engine (armeabi-v7a and arm64-v8a),playback,must,yes,yes,Compiled native libtorrentstreamer.so for Sony BRAVIA TV (armeabi-v7a) and arm64 devices
+Built-in Android TV D-pad video player activity plus mpv-android integration,playback,must,yes,yes,Native TrovaPlayerActivity + mpv-android support without portrait rotation bug
+TV Series Season selector and Episode cards with 16:9 stills and episode streaming,seasons,must,yes,yes,Full episode browser with per-episode swarm resolution and Season Pack binge mode
+10-foot Split Search Studio with D-pad On-Screen Keyboard and live poster grid,search,must,yes,yes,BBC iPlayer / Netflix style ABC/123 D-pad keyboard + instant title and actor matches
+Multi-facet Discover Studio with Genre Service Language Year Rating and TV Status filters,discover,must,yes,yes,6-column 10-foot poster grid with tri-state genres and pagination
+Franchises 470+ Movie Collections and IMDb Top 100 Movies and TV Series browser,collections,must,yes,yes,Reuses collection_movies.json and imdbTop100Catalog.js
+Global Film (47 ceremonies) and Television (40 ceremonies) Awards showcase,awards,must,yes,yes,Reuses awards_catalog.js and tv_awards_catalog.js with ceremony filter pills
+Cast and Crew rail with full Actor and Director Filmography screen,people,must,yes,yes,Complete career filmography swimlanes and biography
+My Watchlist custom collections and 75 GB Offline Downloads manager,library,must,yes,yes,Persistent AsyncStorage watchlist + torrent download progress pause resume and offline play
+YouTube Trailer playback modal on TV detail page,detail,should,yes,yes,In-app 16:9 WebView / YouTube trailer player modal
+Based-on literary source material and Wikidata awards breakdown on detail page,detail,should,yes,yes,Shows book/play source and detailed ceremony wins/nominations
+Franchise continuation rail on movie detail pages,detail,should,yes,yes,Displays full film series order with release state
+Similar and Recommended titles swimlanes on detail pages,detail,should,yes,yes,TMDb recommendations and similar titles rails
+Recent viewed titles history rail with 1-click clear,search,should,yes,yes,Persisted recently opened titles on Search studio
+Now Playing in US Theaters swimlane,search,should,yes,yes,Live theatrical releases rail
+API rate quota telemetry panel for TMDb Trakt and OMDb,settings,should,yes,yes,Real-time API quota and rate-limit status in Settings
+Watchlist and Collections JSON export and import backup,settings,should,yes,yes,Library backup and merge utilities
+Rail sort toggle between Highest Rated and Chronological order,home,should,yes,yes,1-click D-pad sort toggle on swimlanes
+Dynamic ambient backdrop palette tinting on detail screen,detail,should,yes,yes,Poster/backdrop color atmosphere gradient
+Soundtrack album lookup on detail screen,detail,could,yes,yes,Wikidata soundtrack metadata display
+Quick-pick regional and vibe smart filters in Discover,discover,could,yes,yes,Nordic Noir K-Drama Anime A24-style vibe quick filters
+Collection search filter inside Franchises view,collections,could,yes,yes,Filter 470+ movie franchises by keyword
+jump-to-top D-pad shortcut on long grids,discover,could,yes,yes,Quick return to filter bar from deep grid rows
+Proprietary DRM studio video catalogue,content,could,yes,skip,Licensed studio streams belong to each network; Trova provides metadata + user swarm playback
+Paid monthly subscription paywall and household IP lock,billing,could,yes,skip,Trova TV is 100% free and local-first with no account lock-in
+Zero auto-play audio trailers on D-pad focus,ux-fixes,must,no,yes,Fixes #1 smart TV user complaint: silent high-res backdrop preview without jarring auto-play audio
+Unified multi-critic ratings (IMDb + Rotten Tomatoes + Metacritic) on every detail screen,ux-fixes,must,no,yes,Replaces manipulative % match scores with real verifiable critic and audience ratings
+Cross-service Where-to-Watch guide combined with 1-click peer swarm playback,ux-fixes,must,no,yes,Eliminates app-hopping across 8 separate TV streaming apps
+Automatic English subtitle resolution from OpenSubtitles/Subdl/Podnapisi on stream start,ux-fixes,must,no,yes,Fetches and attaches synced SRT subtitles automatically via local Go engine
+87 Global Film and Television Award Ceremonies browsable on TV,ux-fixes,should,no,yes,Curated Oscars Cannes BAFTA Emmy Peabody honors archive
+True landscape-locked TV playback lifecycle without mobile portrait snap-back,ux-fixes,must,no,yes,Never forces portrait orientation on Android TV exit
