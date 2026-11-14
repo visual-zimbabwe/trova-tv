@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TvFocusable } from './TvFocusable';
 import { TvPosterCard } from './TvPosterCard';
@@ -7,6 +7,7 @@ import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
 import { getUserWatchlistCollections, watchlistEntryKey } from '../lib/watchlistModel';
 import { sortRailItems } from '../lib/railSort';
+import { TV_SPACE, TV_TYPE } from './tvTheme';
 
 const PAGE_SIZE = 60;
 
@@ -21,9 +22,16 @@ export function TvWatchlistScreen({
   onSelectItem,
   onToggleWatchlist,
 }) {
+  const scrollRef = useRef(null);
   const [selectedFilter, setSelectedFilter] = useState('shelves');
   const [sortMode, setSortMode] = useState('rating');
   const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+
+  const handleRailFocus = useCallback((railY) => {
+    if (typeof railY === 'number') {
+      scrollRef.current?.scrollTo({ y: Math.max(0, railY - 120), animated: true });
+    }
+  }, []);
 
   const userCols = useMemo(() => getUserWatchlistCollections(collections), [collections]);
 
@@ -74,6 +82,7 @@ export function TvWatchlistScreen({
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
@@ -88,7 +97,7 @@ export function TvWatchlistScreen({
 
         <TvFocusable
           onPress={() => setSortMode((prev) => (prev === 'rating' ? 'year' : 'rating'))}
-          scaleOnFocus={1.04}
+          scaleOnFocus={1.05}
           borderRadius={999}
           style={styles.sortPill}
         >
@@ -122,7 +131,7 @@ export function TvWatchlistScreen({
               key={tab.key}
               hasTVPreferredFocus={idx === 0}
               onPress={() => handleSelectTab(tab.key)}
-              scaleOnFocus={1.04}
+              scaleOnFocus={1.05}
               borderRadius={999}
               style={[styles.filterPill, active && styles.filterPillActive]}
             >
@@ -154,6 +163,7 @@ export function TvWatchlistScreen({
               onSelectItem={onSelectItem}
               onToggleWatchlist={onToggleWatchlist}
               onExplore={() => handleSelectTab(shelf.col.id)}
+              onRailFocus={handleRailFocus}
             />
           ))}
         </View>
@@ -186,7 +196,7 @@ export function TvWatchlistScreen({
             <View style={styles.loadMoreWrap}>
               <TvFocusable
                 onPress={() => setVisibleLimit((prev) => prev + PAGE_SIZE)}
-                scaleOnFocus={1.04}
+                scaleOnFocus={1.05}
                 borderRadius={999}
                 style={styles.loadMoreBtn}
               >
@@ -208,103 +218,114 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 56,
-    paddingTop: 16,
+    paddingBottom: 64,
+    paddingTop: 20,
   },
   headerBlock: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingHorizontal: 28,
+    marginBottom: 14,
+    paddingHorizontal: TV_SPACE.overscanX,
   },
   eyebrow: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: 10,
+    fontSize: TV_TYPE.eyebrow,
     fontWeight: '700',
     letterSpacing: 1.4,
   },
   title: {
     color: '#F5EEE1',
     fontFamily: fonts.display,
-    fontSize: 24,
+    fontSize: TV_TYPE.h1,
     fontWeight: '800',
   },
   sortPill: {
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 238, 225, 0.10)',
+    justifyContent: 'center',
+    minHeight: TV_SPACE.chipMin,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
   },
   sortText: {
     color: GOLD_ACCENT,
     fontFamily: fonts.heading,
-    fontSize: 11.5,
+    fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
   filterStrip: {
-    gap: 8,
-    marginBottom: 18,
-    paddingHorizontal: 28,
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 22,
+    paddingHorizontal: TV_SPACE.overscanX,
+    paddingVertical: 6,
   },
   filterPill: {
-    backgroundColor: 'rgba(245, 238, 225, 0.06)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 238, 225, 0.08)',
+    justifyContent: 'center',
+    minHeight: TV_SPACE.chipMin,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
   },
   filterPillActive: {
     backgroundColor: GOLD_ACCENT,
   },
   filterPillText: {
-    color: '#D8D3C8',
+    color: '#E6E1D7',
     fontFamily: fonts.heading,
-    fontSize: 12,
+    fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
   filterPillTextActive: {
-    color: '#1A1204',
+    color: '#140F06',
   },
   emptyBox: {
     alignItems: 'center',
     backgroundColor: 'rgba(245, 238, 225, 0.03)',
     borderRadius: 14,
-    marginHorizontal: 28,
+    marginHorizontal: TV_SPACE.overscanX,
     marginTop: 24,
     padding: 36,
   },
   emptyTitle: {
     color: '#F5EEE1',
     fontFamily: fonts.heading,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     marginTop: 10,
   },
   emptySub: {
-    color: '#A39E94',
+    color: '#C7C1B7',
     fontFamily: fonts.body,
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: TV_TYPE.meta,
+    marginTop: 6,
     textAlign: 'center',
   },
   gridWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
-    paddingHorizontal: 28,
+    gap: TV_SPACE.cardGap,
+    paddingHorizontal: TV_SPACE.overscanX,
   },
   loadMoreWrap: {
     alignItems: 'center',
-    marginTop: 24,
+    marginTop: 28,
   },
   loadMoreBtn: {
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
-    paddingHorizontal: 22,
-    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 238, 225, 0.10)',
+    justifyContent: 'center',
+    minHeight: TV_SPACE.targetMin,
+    paddingHorizontal: 24,
+    paddingVertical: 11,
   },
   loadMoreText: {
     color: GOLD_ACCENT,
     fontFamily: fonts.heading,
-    fontSize: 13,
+    fontSize: TV_TYPE.button,
     fontWeight: '700',
   },
 });

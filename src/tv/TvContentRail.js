@@ -5,10 +5,12 @@ import { TvFocusable } from './TvFocusable';
 import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
 import { watchlistEntryKey } from '../lib/watchlistModel';
+import { TV_CARD, TV_FOCUS, TV_SPACE, TV_TYPE } from './tvTheme';
 
 /**
  * 10-Foot Horizontal Content Swimlane Rail.
- * Automatically centers the focused card in the horizontal list when navigated via D-pad.
+ * Aligns the focused card at a fixed left keyline (`viewPosition: 0`) so card #1
+ * never scrolls under the sidebar and vertical/horizontal D-pad focus is predictable.
  */
 export const TvContentRail = memo(function TvContentRail({
   title,
@@ -27,33 +29,46 @@ export const TvContentRail = memo(function TvContentRail({
   onRailFocus,
 }) {
   const flatListRef = useRef(null);
+  const railYRef = useRef(0);
   const handleSeeAll = onSeeAll || onExplore;
+
+  const notifyRailFocus = useCallback(() => {
+    onRailFocus?.(railYRef.current);
+  }, [onRailFocus]);
 
   const handleCardFocus = useCallback(
     (index) => {
-      onRailFocus?.();
+      notifyRailFocus();
       if (flatListRef.current && index >= 0 && index < data.length) {
         try {
           flatListRef.current.scrollToIndex({
             index,
             animated: true,
-            viewPosition: 0.25,
+            viewPosition: 0,
+            viewOffset: TV_SPACE.overscanX,
           });
         } catch {
           // Ignore layout race before measurement
         }
       }
     },
-    [data.length, onRailFocus],
+    [data.length, notifyRailFocus],
   );
 
   if (!Array.isArray(data) || data.length === 0) return null;
 
-  const cardSpan = variant === 'backdrop' ? 248 : showRank ? 178 : 150;
+  const baseCardW = variant === 'backdrop' ? TV_CARD.backdropW : TV_CARD.posterW;
+  const rankExtra = showRank ? 44 : 0;
+  const cardSpan = baseCardW + rankExtra + TV_SPACE.cardGap;
 
   return (
-    <View style={styles.railContainer}>
-      {/* Header Row */}
+    <View
+      style={styles.railContainer}
+      onLayout={(e) => {
+        railYRef.current = e.nativeEvent.layout.y;
+      }}
+    >
+      {/* Header Row — left-aligned actions keep vertical D-pad axis predictable */}
       <View style={styles.headerRow}>
         <View style={styles.titleGroup}>
           {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
@@ -62,37 +77,37 @@ export const TvContentRail = memo(function TvContentRail({
               {title}
             </Text>
             {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+
+            <View style={styles.actionsGroup}>
+              {onToggleSort ? (
+                <TvFocusable
+                  onPress={onToggleSort}
+                  onFocus={notifyRailFocus}
+                  scaleOnFocus={TV_FOCUS.scaleSmall}
+                  borderRadius={999}
+                  style={styles.headerPill}
+                  accessibilityLabel={`Sort ${title} by ${sortMode === 'year' ? 'rating' : 'year'}`}
+                >
+                  <Text style={styles.headerPillText}>
+                    {sortMode === 'year' ? 'Chronological' : 'Top Rated'}
+                  </Text>
+                </TvFocusable>
+              ) : null}
+
+              {handleSeeAll ? (
+                <TvFocusable
+                  onPress={handleSeeAll}
+                  onFocus={notifyRailFocus}
+                  scaleOnFocus={TV_FOCUS.scaleSmall}
+                  borderRadius={999}
+                  style={styles.headerPill}
+                  accessibilityLabel={`See all ${title}`}
+                >
+                  <Text style={styles.headerPillText}>Explore All</Text>
+                </TvFocusable>
+              ) : null}
+            </View>
           </View>
-        </View>
-
-        <View style={styles.actionsGroup}>
-          {onToggleSort ? (
-            <TvFocusable
-              onPress={onToggleSort}
-              onFocus={onRailFocus}
-              scaleOnFocus={1.04}
-              borderRadius={999}
-              style={styles.headerPill}
-              accessibilityLabel={`Sort ${title} by ${sortMode === 'year' ? 'rating' : 'year'}`}
-            >
-              <Text style={styles.headerPillText}>
-                {sortMode === 'year' ? 'Chronological' : 'Top Rated'}
-              </Text>
-            </TvFocusable>
-          ) : null}
-
-          {handleSeeAll ? (
-            <TvFocusable
-              onPress={handleSeeAll}
-              onFocus={onRailFocus}
-              scaleOnFocus={1.04}
-              borderRadius={999}
-              style={styles.headerPill}
-              accessibilityLabel={`See all ${title}`}
-            >
-              <Text style={styles.headerPillText}>Explore All</Text>
-            </TvFocusable>
-          ) : null}
         </View>
       </View>
 
@@ -145,65 +160,69 @@ export const TvContentRail = memo(function TvContentRail({
 
 const styles = StyleSheet.create({
   railContainer: {
-    marginBottom: 22,
+    marginBottom: TV_SPACE.railGap,
   },
   headerRow: {
     alignItems: 'flex-end',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
     marginBottom: 8,
-    paddingHorizontal: 28,
+    paddingHorizontal: TV_SPACE.overscanX,
   },
   titleGroup: {
     flex: 1,
-    paddingRight: 16,
   },
   eyebrow: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: 10,
+    fontSize: TV_TYPE.eyebrow,
     fontWeight: '700',
     letterSpacing: 1.4,
-    marginBottom: 2,
+    marginBottom: 3,
     textTransform: 'uppercase',
   },
   titleLine: {
-    alignItems: 'baseline',
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: 10,
+    flexWrap: 'wrap',
+    gap: 14,
   },
   title: {
     color: '#F5EEE1',
     fontFamily: fonts.heading,
-    fontSize: 18,
+    fontSize: TV_TYPE.railTitle,
     fontWeight: '700',
   },
   subtitle: {
-    color: '#8E887E',
+    color: '#B5AFA4',
     fontFamily: fonts.body,
-    fontSize: 12,
+    fontSize: TV_TYPE.meta,
   },
   actionsGroup: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
+    marginLeft: 6,
   },
   headerPill: {
-    backgroundColor: 'rgba(245, 238, 225, 0.06)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 238, 225, 0.08)',
+    justifyContent: 'center',
+    minHeight: TV_SPACE.chipMin,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   headerPillText: {
-    color: '#D5BA8A',
+    color: '#F0DEC0',
     fontFamily: fonts.label,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: TV_TYPE.meta,
+    fontWeight: '700',
   },
   listContent: {
-    paddingHorizontal: 28,
-    paddingVertical: 6,
+    paddingHorizontal: TV_SPACE.overscanX,
+    paddingVertical: 16,
   },
   cardSlot: {
-    marginRight: 12,
+    marginRight: TV_SPACE.cardGap,
   },
 });

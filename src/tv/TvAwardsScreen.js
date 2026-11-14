@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TvFocusable } from './TvFocusable';
 import { TvContentRail } from './TvContentRail';
@@ -8,6 +8,7 @@ import {
   getAwardCeremonyRows,
   getTvAwardCeremonyRows,
 } from '../lib/awardsCatalog';
+import { TV_FOCUS, TV_SPACE, TV_TYPE } from './tvTheme';
 
 /**
  * S08: 10-Foot Global Film (47 Ceremonies) & Television (40 Ceremonies) Awards Showcase.
@@ -17,8 +18,19 @@ export function TvAwardsScreen({
   onSelectItem,
   onToggleWatchlist,
 }) {
+  const scrollRef = useRef(null);
   const [category, setCategory] = useState('all'); // 'all' | 'film' | 'tv'
   const [selectedCeremonyId, setSelectedCeremonyId] = useState(null);
+
+  const handleTopFocus = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
+  const handleRailFocus = useCallback((railY) => {
+    if (typeof railY === 'number') {
+      scrollRef.current?.scrollTo({ y: Math.max(0, railY - 120), animated: true });
+    }
+  }, []);
 
   const filmRows = useMemo(() => getAwardCeremonyRows() || [], []);
   const tvRows = useMemo(() => getTvAwardCeremonyRows() || [], []);
@@ -45,6 +57,7 @@ export function TvAwardsScreen({
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
@@ -58,11 +71,12 @@ export function TvAwardsScreen({
         <View style={styles.tabsRow}>
           <TvFocusable
             hasTVPreferredFocus={true}
+            onFocus={handleTopFocus}
             onPress={() => {
               setCategory('all');
               setSelectedCeremonyId(null);
             }}
-            scaleOnFocus={1.05}
+            scaleOnFocus={TV_FOCUS.scaleSmall}
             borderRadius={999}
             style={[styles.tabPill, category === 'all' && styles.tabPillActive]}
           >
@@ -72,11 +86,12 @@ export function TvAwardsScreen({
           </TvFocusable>
 
           <TvFocusable
+            onFocus={handleTopFocus}
             onPress={() => {
               setCategory('film');
               setSelectedCeremonyId(null);
             }}
-            scaleOnFocus={1.05}
+            scaleOnFocus={TV_FOCUS.scaleSmall}
             borderRadius={999}
             style={[styles.tabPill, category === 'film' && styles.tabPillActive]}
           >
@@ -86,11 +101,12 @@ export function TvAwardsScreen({
           </TvFocusable>
 
           <TvFocusable
+            onFocus={handleTopFocus}
             onPress={() => {
               setCategory('tv');
               setSelectedCeremonyId(null);
             }}
-            scaleOnFocus={1.05}
+            scaleOnFocus={TV_FOCUS.scaleSmall}
             borderRadius={999}
             style={[styles.tabPill, category === 'tv' && styles.tabPillActive]}
           >
@@ -108,8 +124,9 @@ export function TvAwardsScreen({
         contentContainerStyle={styles.ceremonyStrip}
       >
         <TvFocusable
+          onFocus={handleTopFocus}
           onPress={() => setSelectedCeremonyId(null)}
-          scaleOnFocus={1.05}
+          scaleOnFocus={TV_FOCUS.scaleSmall}
           borderRadius={999}
           style={[styles.ceremonyChip, !selectedCeremonyId && styles.tabPillActive]}
         >
@@ -125,8 +142,9 @@ export function TvAwardsScreen({
           return (
             <TvFocusable
               key={rowId}
+              onFocus={handleTopFocus}
               onPress={() => setSelectedCeremonyId((prev) => (prev === rowId ? null : rowId))}
-              scaleOnFocus={1.05}
+              scaleOnFocus={TV_FOCUS.scaleSmall}
               borderRadius={999}
               style={[styles.ceremonyChip, active && styles.tabPillActive]}
             >
@@ -153,6 +171,7 @@ export function TvAwardsScreen({
             savedKeys={savedKeys}
             onSelectItem={onSelectItem}
             onToggleWatchlist={onToggleWatchlist}
+            onRailFocus={handleRailFocus}
           />
         );
       })}
@@ -166,71 +185,81 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 56,
-    paddingTop: 16,
+    paddingBottom: 64,
+    paddingTop: 20,
   },
   headerBlock: {
     alignItems: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
     justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingHorizontal: 28,
+    marginBottom: 14,
+    paddingHorizontal: TV_SPACE.overscanX,
   },
   eyebrow: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: 10,
+    fontSize: TV_TYPE.eyebrow,
     fontWeight: '700',
     letterSpacing: 1.4,
   },
   title: {
     color: '#F5EEE1',
     fontFamily: fonts.display,
-    fontSize: 24,
+    fontSize: TV_TYPE.h1,
     fontWeight: '800',
   },
   tabsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   tabPill: {
+    alignItems: 'center',
     backgroundColor: '#191610',
     borderColor: 'rgba(212, 168, 83, 0.35)',
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    justifyContent: 'center',
+    minHeight: TV_SPACE.chipMin,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
   },
   tabPillActive: {
     backgroundColor: GOLD_ACCENT,
     borderColor: GOLD_ACCENT,
   },
   tabText: {
-    color: '#E1DDD7',
+    color: '#E6E1D7',
     fontFamily: fonts.label,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: TV_TYPE.meta,
+    fontWeight: '700',
   },
   tabTextActive: {
-    color: '#1A1204',
+    color: '#140F06',
     fontFamily: fonts.heading,
     fontWeight: '800',
   },
   ceremonyStrip: {
-    gap: 8,
-    marginBottom: 18,
-    paddingHorizontal: 28,
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 22,
+    paddingHorizontal: TV_SPACE.overscanX,
+    paddingVertical: 6,
   },
   ceremonyChip: {
+    alignItems: 'center',
     backgroundColor: '#14110C',
     borderColor: '#312D27',
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    minHeight: TV_SPACE.chipMin,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   ceremonyChipText: {
-    color: '#D5BA8A',
+    color: '#E6CD9C',
     fontFamily: fonts.label,
-    fontSize: 11.5,
-    fontWeight: '600',
+    fontSize: TV_TYPE.meta,
+    fontWeight: '700',
   },
 });

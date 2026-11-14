@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TvFocusable } from './TvFocusable';
 import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
+import { TV_SPACE, TV_TYPE } from './tvTheme';
 import {
   formatQuotaLine,
   getRateQuotaSnapshot,
@@ -119,27 +120,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 56,
-    paddingHorizontal: 28,
-    paddingTop: 16,
+    paddingBottom: 64,
+    paddingHorizontal: TV_SPACE.overscanX,
+    paddingTop: 20,
   },
   eyebrow: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: 10,
+    fontSize: TV_TYPE.eyebrow,
     fontWeight: '700',
     letterSpacing: 1.4,
   },
   title: {
     color: '#F5EEE1',
     fontFamily: fonts.display,
-    fontSize: 24,
+    fontSize: TV_TYPE.h1,
     fontWeight: '800',
     marginBottom: 18,
   },
   gridRow: {
     flexDirection: 'row',
-    gap: 18,
+    gap: 20,
   },
   card: {
     backgroundColor: '#0D0B07',
@@ -147,20 +148,20 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     flex: 1,
-    padding: 18,
+    padding: 20,
   },
   cardEyebrow: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: 9.5,
+    fontSize: TV_TYPE.eyebrow,
     fontWeight: '700',
     letterSpacing: 1.2,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   cardTitle: {
     color: '#F5EEE1',
     fontFamily: fonts.heading,
-    fontSize: 17,
+    fontSize: TV_TYPE.railTitle,
     fontWeight: '700',
     marginBottom: 14,
   },
@@ -169,25 +170,28 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 10,
   },
   kvKey: {
-    color: '#A39E94',
+    color: '#C7C1B7',
     fontFamily: fonts.label,
-    fontSize: 12,
+    fontSize: TV_TYPE.meta,
   },
   kvVal: {
     color: '#F5EEE1',
     fontFamily: fonts.heading,
-    fontSize: 12,
+    fontSize: TV_TYPE.meta,
     fontWeight: '600',
   },
   actionBtn: {
+    alignItems: 'center',
     backgroundColor: '#191610',
     borderColor: 'rgba(212, 168, 83, 0.4)',
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    justifyContent: 'center',
+    minHeight: TV_SPACE.targetMin,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
   },
   btnInner: {
     alignItems: 'center',
@@ -197,29 +201,29 @@ const styles = StyleSheet.create({
   actionBtnText: {
     color: GOLD_ACCENT,
     fontFamily: fonts.heading,
-    fontSize: 12.5,
+    fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
   quotaBlock: {
     borderBottomColor: '#191610',
     borderBottomWidth: 1,
-    paddingVertical: 10,
+    paddingVertical: 12,
   },
   quotaHeader: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 7,
+    gap: 8,
   },
   quotaName: {
     color: '#F5EEE1',
     fontFamily: fonts.heading,
-    fontSize: 13,
+    fontSize: TV_TYPE.cardTitle,
     fontWeight: '700',
   },
   quotaDetail: {
-    color: '#A39E94',
+    color: '#C7C1B7',
     fontFamily: fonts.body,
-    fontSize: 11.5,
-    marginTop: 3,
+    fontSize: TV_TYPE.meta,
+    marginTop: 4,
   },
 });
