@@ -48,6 +48,30 @@ test('TvFocusable wraps Pressable in an outer scaling Animated.View with warm-wh
     animViewIdx > -1 && pressableIdx > animViewIdx,
     'Animated.View must wrap Pressable on the outside so card frames and borders lift together',
   );
+  assert.match(src, /\.\.\.innerStyle/);
+  assert.match(src, /innerStyle,/);
+  assert.doesNotMatch(
+    src.slice(pressableIdx),
+    /\bstyle,\b/,
+    'Pressable must receive innerStyle (without flex) so row-flex buttons do not collapse vertically',
+  );
+});
+
+test('TvSearchScreen renders Space, Delete, Clear row and fits 6-column keyboard grid inside left pane', () => {
+  const src = read('src/tv/TvSearchScreen.js');
+  assert.match(src, /accessibilityLabel="Space"/);
+  assert.match(src, /accessibilityLabel="Backspace"/);
+  assert.match(src, /accessibilityLabel="Clear search"/);
+  assert.match(src, /specialKeysRow:\s*\{[^}]*height:\s*\d+/s);
+
+  const paneWidth = Number(src.match(/leftKeyboardPane:\s*\{[^}]*width:\s*(\d+)/s)?.[1]);
+  const keyWidth = Number(src.match(/keyCell:\s*\{[^}]*width:\s*(\d+)/s)?.[1]);
+  const keyGap = Number(src.match(/keyGrid:\s*\{[^}]*gap:\s*(\d+)/s)?.[1]);
+  const innerWidth = paneWidth - 2 * TV_SPACE.overscanX;
+  assert.ok(
+    6 * keyWidth + 5 * keyGap <= innerWidth,
+    `6-column keyboard (${6 * keyWidth + 5 * keyGap}dp) must fit inside leftKeyboardPane inner width (${innerWidth}dp)`,
+  );
 });
 
 test('TvSidebar and TvTopNav expose text-only navigation and distinguish active tab from focus', () => {
