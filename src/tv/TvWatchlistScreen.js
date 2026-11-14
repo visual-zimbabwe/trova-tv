@@ -88,22 +88,22 @@ export function TvWatchlistScreen({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerBlock}>
-        <View>
-          <Text style={styles.eyebrow}>PERSONAL LIBRARY · MOBILE SYNCED</Text>
-          <Text style={styles.title}>
-            My Watchlist ({selectedFilter === 'shelves' ? watchlist.length : filteredItems.length})
-          </Text>
-        </View>
+        <Text style={styles.title}>
+          Watchlist ({selectedFilter === 'shelves' ? watchlist.length : filteredItems.length})
+        </Text>
 
         <TvFocusable
+          appearance="text"
           onPress={() => setSortMode((prev) => (prev === 'rating' ? 'year' : 'rating'))}
-          scaleOnFocus={1.05}
-          borderRadius={999}
+          scaleOnFocus={1.04}
+          borderRadius={6}
           style={styles.sortPill}
         >
-          <Text style={styles.sortText}>
-            {sortMode === 'rating' ? 'Highest Rated' : 'Release Year'}
-          </Text>
+          {({ focused }) => (
+            <Text style={[styles.sortText, focused && styles.textFocused]}>
+              {sortMode === 'rating' ? 'Highest Rated' : 'Release Year'}
+            </Text>
+          )}
         </TvFocusable>
       </View>
 
@@ -114,7 +114,7 @@ export function TvWatchlistScreen({
         contentContainerStyle={styles.filterStrip}
       >
         {[
-          { key: 'shelves', label: `Collection Shelves (${collectionShelves.length})` },
+          { key: 'shelves', label: `Collections (${collectionShelves.length})` },
           { key: 'all', label: `All Saved (${watchlist.length})` },
           { key: 'movie', label: `Films (${moviesCount})` },
           { key: 'tv', label: `TV Series (${tvCount})` },
@@ -129,15 +129,27 @@ export function TvWatchlistScreen({
           return (
             <TvFocusable
               key={tab.key}
+              appearance="text"
               hasTVPreferredFocus={idx === 0}
               onPress={() => handleSelectTab(tab.key)}
-              scaleOnFocus={1.05}
-              borderRadius={999}
-              style={[styles.filterPill, active && styles.filterPillActive]}
+              scaleOnFocus={1.04}
+              borderRadius={6}
+              style={styles.filterPill}
             >
-              <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
-                {tab.label}
-              </Text>
+              {({ focused }) => (
+                <View style={styles.filterInner}>
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      active && styles.filterPillTextActive,
+                      focused && styles.textFocused,
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
             </TvFocusable>
           );
         })}
@@ -155,9 +167,7 @@ export function TvWatchlistScreen({
           {collectionShelves.map((shelf) => (
             <TvContentRail
               key={shelf.col.id}
-              eyebrow={shelf.col.source === 'custom' ? 'CUSTOM COLLECTION' : 'WATCHLIST SHELF'}
               title={shelf.col.name}
-              subtitle={`${shelf.count} titles`}
               data={shelf.items.slice(0, 32)}
               savedKeys={savedKeys}
               onSelectItem={onSelectItem}
@@ -195,14 +205,17 @@ export function TvWatchlistScreen({
           {filteredItems.length > visibleLimit ? (
             <View style={styles.loadMoreWrap}>
               <TvFocusable
+                appearance="text"
                 onPress={() => setVisibleLimit((prev) => prev + PAGE_SIZE)}
-                scaleOnFocus={1.05}
-                borderRadius={999}
+                scaleOnFocus={1.04}
+                borderRadius={8}
                 style={styles.loadMoreBtn}
               >
-                <Text style={styles.loadMoreText}>
-                  Show More ({visibleLimit} of {filteredItems.length})
-                </Text>
+                {({ focused }) => (
+                  <Text style={[styles.loadMoreText, focused && styles.textFocused]}>
+                    Show More ({visibleLimit} of {filteredItems.length})
+                  </Text>
+                )}
               </TvFocusable>
             </View>
           ) : null}
@@ -219,21 +232,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 64,
-    paddingTop: 20,
+    paddingTop: 14,
   },
   headerBlock: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 10,
     paddingHorizontal: TV_SPACE.overscanX,
-  },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
   },
   title: {
     color: '#F5EEE1',
@@ -243,11 +249,10 @@ const styles = StyleSheet.create({
   },
   sortPill: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.10)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   sortText: {
     color: GOLD_ACCENT,
@@ -255,37 +260,47 @@ const styles = StyleSheet.create({
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
+  textFocused: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
   filterStrip: {
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 22,
+    gap: 14,
+    marginBottom: 20,
     paddingHorizontal: TV_SPACE.overscanX,
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   filterPill: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  filterPillActive: {
-    backgroundColor: GOLD_ACCENT,
+  filterInner: {
+    alignItems: 'center',
   },
   filterPillText: {
-    color: '#E6E1D7',
-    fontFamily: fonts.heading,
+    color: '#ABA59B',
+    fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   filterPillTextActive: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
+    fontFamily: fonts.heading,
+    fontWeight: '700',
+  },
+  activeUnderline: {
+    backgroundColor: GOLD_ACCENT,
+    borderRadius: 1,
+    height: 2,
+    marginTop: 4,
+    width: '100%',
   },
   emptyBox: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.03)',
-    borderRadius: 14,
     marginHorizontal: TV_SPACE.overscanX,
     marginTop: 24,
     padding: 36,
@@ -316,11 +331,10 @@ const styles = StyleSheet.create({
   },
   loadMoreBtn: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.10)',
     justifyContent: 'center',
     minHeight: TV_SPACE.targetMin,
-    paddingHorizontal: 24,
-    paddingVertical: 11,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
   },
   loadMoreText: {
     color: GOLD_ACCENT,

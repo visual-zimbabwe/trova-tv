@@ -26,6 +26,7 @@ import {
   removeCollectionFromWatchlist,
   applySetStatus,
   upsertItem,
+  quickToggleWatchlistItem,
   recordRecentDestination,
   removeItem,
   markItemWatched,
@@ -496,6 +497,28 @@ export function useWatchlistController({ showToast }) {
     [watchlist, openWatchlistSheet],
   );
 
+  const handleQuickToggleWatchlist = useCallback(async (result) => {
+    const previous = watchlistRef.current;
+    const { action, item, watchlist: next } = quickToggleWatchlistItem(previous, result);
+    if (action === 'noop') return;
+    setWatchlist(next);
+    watchlistRef.current = next;
+    const label = item?.title || result?.title || result?.name || 'Title';
+    toastiva.success(
+      action === 'removed'
+        ? `Removed ${label} from Watchlist`
+        : `Added ${label} to Watchlist`,
+      { haptic: false },
+    );
+    try {
+      await saveWatchlist(next);
+    } catch {
+      setWatchlist(previous);
+      watchlistRef.current = previous;
+      toastiva.error('Failed to update Watchlist');
+    }
+  }, []);
+
   const handleEnrichWatchlistItem = useCallback(async (tmdbId, mediaType, fields) => {
     const key = `${mediaType}:${tmdbId}`;
     setWatchlist((prev) => {
@@ -715,6 +738,7 @@ export function useWatchlistController({ showToast }) {
     syncWatchlistFromResolvedDetail,
     openWatchlistSheet,
     handleToggleWatchlist,
+    handleQuickToggleWatchlist,
     handleSaveWholeCollection,
     handleEnrichWatchlistItem,
     handleRemoveWatchlistItem,

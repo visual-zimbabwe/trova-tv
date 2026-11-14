@@ -7,13 +7,19 @@ const GOLD_ACCENT = '#D4A853';
  * - Minimum readable typography is 13-14 dp (26-28 px on 1080p TV).
  */
 export const TV_FOCUS = {
-  ringColor: '#FFF4DC',
-  ringWidth: 3,
+  ringColor: 'rgba(255, 244, 220, 0.70)',
+  ringWidth: 2,
   gapColor: '#040301',
-  glow: '0px 0px 18px 4px rgba(255, 244, 220, 0.45)',
-  scale: 1.08,
-  scaleSmall: 1.05,
-  surface: 'rgba(255, 244, 220, 0.16)',
+  glow: '0px 0px 22px 2px rgba(255, 244, 220, 0.28)',
+  scale: 1.06,
+  scaleSmall: 1.04,
+  surface: 'rgba(255, 244, 220, 0.10)',
+};
+
+export const TV_ACTIVE = {
+  text: GOLD_ACCENT,
+  underline: GOLD_ACCENT,
+  underlineWidth: 2,
 };
 
 export const TV_SELECTED = {

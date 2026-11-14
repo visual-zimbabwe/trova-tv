@@ -68,48 +68,43 @@ export function TvCollectionsScreen({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerBlock}>
-        <View>
-          <Text style={styles.eyebrow}>CURATED ARCHIVES & CANON</Text>
-          <Text style={styles.title}>Franchises & IMDb Top 100</Text>
-        </View>
+        <Text style={styles.title}>Collections</Text>
 
         <View style={styles.tabsRow}>
-          <TvFocusable
-            hasTVPreferredFocus={true}
-            onFocus={handleTopFocus}
-            onPress={() => setTab('franchises')}
-            scaleOnFocus={TV_FOCUS.scaleSmall}
-            borderRadius={999}
-            style={[styles.tabPill, tab === 'franchises' && styles.tabPillActive]}
-          >
-            <Text style={[styles.tabText, tab === 'franchises' && styles.tabTextActive]}>
-              Film Franchises ({rows.length})
-            </Text>
-          </TvFocusable>
-
-          <TvFocusable
-            onFocus={handleTopFocus}
-            onPress={() => setTab('imdb-movies')}
-            scaleOnFocus={TV_FOCUS.scaleSmall}
-            borderRadius={999}
-            style={[styles.tabPill, tab === 'imdb-movies' && styles.tabPillActive]}
-          >
-            <Text style={[styles.tabText, tab === 'imdb-movies' && styles.tabTextActive]}>
-              IMDb Top 100 Films
-            </Text>
-          </TvFocusable>
-
-          <TvFocusable
-            onFocus={handleTopFocus}
-            onPress={() => setTab('imdb-tv')}
-            scaleOnFocus={TV_FOCUS.scaleSmall}
-            borderRadius={999}
-            style={[styles.tabPill, tab === 'imdb-tv' && styles.tabPillActive]}
-          >
-            <Text style={[styles.tabText, tab === 'imdb-tv' && styles.tabTextActive]}>
-              IMDb Top 100 Series
-            </Text>
-          </TvFocusable>
+          {[
+            { key: 'franchises', label: `Film Franchises (${rows.length})`, pref: true },
+            { key: 'imdb-movies', label: 'IMDb Top 100 Films' },
+            { key: 'imdb-tv', label: 'IMDb Top 100 Series' },
+          ].map((item) => {
+            const active = tab === item.key;
+            return (
+              <TvFocusable
+                key={item.key}
+                appearance="text"
+                hasTVPreferredFocus={Boolean(item.pref)}
+                onFocus={handleTopFocus}
+                onPress={() => setTab(item.key)}
+                scaleOnFocus={TV_FOCUS.scaleSmall}
+                borderRadius={6}
+                style={styles.tabPill}
+              >
+                {({ focused }) => (
+                  <View style={styles.tabInner}>
+                    <Text
+                      style={[
+                        styles.tabText,
+                        active && styles.tabTextActive,
+                        focused && styles.textFocused,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                    {active ? <View style={styles.activeUnderline} /> : null}
+                  </View>
+                )}
+              </TvFocusable>
+            );
+          })}
         </View>
       </View>
 
@@ -123,15 +118,27 @@ export function TvCollectionsScreen({
               return (
                 <TvFocusable
                   key={kw}
+                  appearance="text"
                   onFocus={handleTopFocus}
                   onPress={() => setSearchFilter(kw === 'ALL' ? '' : kw)}
                   scaleOnFocus={TV_FOCUS.scaleSmall}
-                  borderRadius={999}
-                  style={[styles.filterChip, active && styles.tabPillActive]}
+                  borderRadius={6}
+                  style={styles.filterChip}
                 >
-                  <Text style={[styles.filterChipText, active && styles.tabTextActive]}>
-                    {kw === 'ALL' ? 'All Franchises' : kw}
-                  </Text>
+                  {({ focused }) => (
+                    <View style={styles.tabInner}>
+                      <Text
+                        style={[
+                          styles.filterChipText,
+                          active && styles.tabTextActive,
+                          focused && styles.textFocused,
+                        ]}
+                      >
+                        {kw === 'ALL' ? 'All Franchises' : kw}
+                      </Text>
+                      {active ? <View style={styles.activeUnderline} /> : null}
+                    </View>
+                  )}
                 </TvFocusable>
               );
             })}
@@ -140,9 +147,7 @@ export function TvCollectionsScreen({
           {filteredFranchiseRows.map((row, idx) => (
             <TvContentRail
               key={row.id || row.title || idx}
-              eyebrow="FILM SAGA"
               title={row.title || row.name}
-              subtitle={`${row.items?.length || row.movies?.length || 0} films`}
               data={row.items || row.movies || []}
               savedKeys={savedKeys}
               onSelectItem={onSelectItem}
@@ -186,7 +191,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 64,
-    paddingTop: 20,
+    paddingTop: 14,
   },
   headerBlock: {
     alignItems: 'center',
@@ -194,15 +199,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 14,
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
     paddingHorizontal: TV_SPACE.overscanX,
-  },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
   },
   title: {
     color: '#F5EEE1',
@@ -212,55 +210,60 @@ const styles = StyleSheet.create({
   },
   tabsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
   },
   tabPill: {
     alignItems: 'center',
-    backgroundColor: '#191610',
-    borderColor: 'rgba(212, 168, 83, 0.35)',
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  tabPillActive: {
-    backgroundColor: GOLD_ACCENT,
-    borderColor: GOLD_ACCENT,
+  tabInner: {
+    alignItems: 'center',
   },
   tabText: {
-    color: '#E6E1D7',
+    color: '#ABA59B',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   tabTextActive: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
+    fontFamily: fonts.heading,
+    fontWeight: '700',
+  },
+  textFocused: {
+    color: '#FFFFFF',
     fontFamily: fonts.heading,
     fontWeight: '800',
+  },
+  activeUnderline: {
+    backgroundColor: GOLD_ACCENT,
+    borderRadius: 1,
+    height: 2,
+    marginTop: 4,
+    width: '100%',
   },
   quickFilterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 22,
+    gap: 12,
+    marginBottom: 20,
     paddingHorizontal: TV_SPACE.overscanX,
   },
   filterChip: {
     alignItems: 'center',
-    backgroundColor: '#14110C',
-    borderColor: '#312D27',
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   filterChipText: {
-    color: '#E6CD9C',
+    color: '#ABA59B',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   gridWrap: {
     flexDirection: 'row',

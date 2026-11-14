@@ -2,7 +2,6 @@ import React, { memo, useCallback, useRef } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { TvPosterCard } from './TvPosterCard';
 import { TvFocusable } from './TvFocusable';
-import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
 import { watchlistEntryKey } from '../lib/watchlistModel';
 import { TV_CARD, TV_FOCUS, TV_SPACE, TV_TYPE } from './tvTheme';
@@ -10,12 +9,10 @@ import { TV_CARD, TV_FOCUS, TV_SPACE, TV_TYPE } from './tvTheme';
 /**
  * 10-Foot Horizontal Content Swimlane Rail.
  * Aligns the focused card at a fixed left keyline (`viewPosition: 0`) so card #1
- * never scrolls under the sidebar and vertical/horizontal D-pad focus is predictable.
+ * never scrolls off-stage and vertical/horizontal D-pad focus is predictable.
  */
 export const TvContentRail = memo(function TvContentRail({
   title,
-  eyebrow,
-  subtitle,
   data = [],
   variant = 'poster',
   showRank = false,
@@ -68,42 +65,58 @@ export const TvContentRail = memo(function TvContentRail({
         railYRef.current = e.nativeEvent.layout.y;
       }}
     >
-      {/* Header Row — left-aligned actions keep vertical D-pad axis predictable */}
+      {/* Header Row — essential short row label + borderless text actions */}
       <View style={styles.headerRow}>
         <View style={styles.titleGroup}>
-          {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
           <View style={styles.titleLine}>
             <Text numberOfLines={1} style={styles.title}>
               {title}
             </Text>
-            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
 
             <View style={styles.actionsGroup}>
               {onToggleSort ? (
                 <TvFocusable
+                  appearance="text"
                   onPress={onToggleSort}
                   onFocus={notifyRailFocus}
                   scaleOnFocus={TV_FOCUS.scaleSmall}
-                  borderRadius={999}
-                  style={styles.headerPill}
+                  borderRadius={6}
+                  style={styles.headerAction}
                   accessibilityLabel={`Sort ${title} by ${sortMode === 'year' ? 'rating' : 'year'}`}
                 >
-                  <Text style={styles.headerPillText}>
-                    {sortMode === 'year' ? 'Chronological' : 'Top Rated'}
-                  </Text>
+                  {({ focused }) => (
+                    <Text
+                      style={[
+                        styles.headerActionText,
+                        focused && styles.headerActionTextFocused,
+                      ]}
+                    >
+                      {sortMode === 'year' ? 'Chronological' : 'Top Rated'}
+                    </Text>
+                  )}
                 </TvFocusable>
               ) : null}
 
               {handleSeeAll ? (
                 <TvFocusable
+                  appearance="text"
                   onPress={handleSeeAll}
                   onFocus={notifyRailFocus}
                   scaleOnFocus={TV_FOCUS.scaleSmall}
-                  borderRadius={999}
-                  style={styles.headerPill}
+                  borderRadius={6}
+                  style={styles.headerAction}
                   accessibilityLabel={`See all ${title}`}
                 >
-                  <Text style={styles.headerPillText}>Explore All</Text>
+                  {({ focused }) => (
+                    <Text
+                      style={[
+                        styles.headerActionText,
+                        focused && styles.headerActionTextFocused,
+                      ]}
+                    >
+                      See All
+                    </Text>
+                  )}
                 </TvFocusable>
               ) : null}
             </View>
@@ -163,29 +176,20 @@ const styles = StyleSheet.create({
     marginBottom: TV_SPACE.railGap,
   },
   headerRow: {
-    alignItems: 'flex-end',
+    alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 4,
     paddingHorizontal: TV_SPACE.overscanX,
   },
   titleGroup: {
     flex: 1,
   },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
-    marginBottom: 3,
-    textTransform: 'uppercase',
-  },
   titleLine: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
+    gap: 16,
   },
   title: {
     color: '#F5EEE1',
@@ -193,34 +197,32 @@ const styles = StyleSheet.create({
     fontSize: TV_TYPE.railTitle,
     fontWeight: '700',
   },
-  subtitle: {
-    color: '#B5AFA4',
-    fontFamily: fonts.body,
-    fontSize: TV_TYPE.meta,
-  },
   actionsGroup: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
     marginLeft: 6,
   },
-  headerPill: {
+  headerAction: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  headerPillText: {
-    color: '#F0DEC0',
-    fontFamily: fonts.label,
+  headerActionText: {
+    color: '#B5AFA4',
+    fontFamily: fonts.heading,
     fontSize: TV_TYPE.meta,
+    fontWeight: '700',
+  },
+  headerActionTextFocused: {
+    color: '#FFFFFF',
     fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: TV_SPACE.overscanX,
-    paddingVertical: 16,
+    paddingVertical: 12,
   },
   cardSlot: {
     marginRight: TV_SPACE.cardGap,

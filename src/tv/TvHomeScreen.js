@@ -177,9 +177,7 @@ export function TvHomeScreen({
       const mode = railSortPrefs['wl-movies'] || 'rating';
       rails.push({
         id: 'wl-movies',
-        eyebrow: 'MY WATCHLIST',
         title: 'Saved Films',
-        subtitle: `${defaultMovies.length} titles`,
         items: sortRailItems(defaultMovies, mode).slice(0, 28),
         sortMode: mode,
       });
@@ -189,9 +187,7 @@ export function TvHomeScreen({
       const mode = railSortPrefs['wl-tv'] || 'rating';
       rails.push({
         id: 'wl-tv',
-        eyebrow: 'MY WATCHLIST',
         title: 'Saved Series',
-        subtitle: `${defaultTv.length} series`,
         items: sortRailItems(defaultTv, mode).slice(0, 28),
         sortMode: mode,
       });
@@ -206,9 +202,7 @@ export function TvHomeScreen({
         const mode = railSortPrefs[railId] || 'rating';
         rails.push({
           id: railId,
-          eyebrow: 'COLLECTION',
           title: col.name,
-          subtitle: `${colItems.length} titles`,
           items: sortRailItems(colItems, mode).slice(0, 28),
           sortMode: mode,
         });
@@ -238,13 +232,6 @@ export function TvHomeScreen({
     return out;
   }, [spotlight, matchesFilter, filteredTrending, filteredNowPlaying, filteredWatchlist]);
 
-  const headerEyebrow =
-    mediaFilter === 'movie'
-      ? 'CINEMA PROGRAMME'
-      : mediaFilter === 'tv'
-        ? 'TELEVISION SERIES'
-        : 'FEATURED SPOTLIGHT';
-
   return (
     <ScrollView
       ref={scrollRef}
@@ -256,57 +243,47 @@ export function TvHomeScreen({
       <TvHeroBillboard
         items={heroItems}
         savedKeys={savedKeys}
-        eyebrow={headerEyebrow}
         onSelectItem={onSelectItem}
         onPlayNow={onPlayNow}
         onToggleWatchlist={onToggleWatchlist}
         onHeroFocus={handleTopFocus}
       />
 
-      {/* Seamless Borderless Facet Filter Bar */}
+      {/* Clean Text Filter Bar */}
       <View style={styles.filterBar}>
-        <TvFocusable
-          onFocus={handleTopFocus}
-          onPress={() => onMediaFilterChange?.(null)}
-          scaleOnFocus={TV_FOCUS.scaleSmall}
-          borderRadius={999}
-          style={[styles.filterPill, !mediaFilter && styles.filterPillActive]}
-        >
-          <Text style={[styles.filterPillText, !mediaFilter && styles.filterPillTextActive]}>
-            All Programme
-          </Text>
-        </TvFocusable>
-
-        <TvFocusable
-          onFocus={handleTopFocus}
-          onPress={() => onMediaFilterChange?.('movie')}
-          scaleOnFocus={TV_FOCUS.scaleSmall}
-          borderRadius={999}
-          style={[styles.filterPill, mediaFilter === 'movie' && styles.filterPillActive]}
-        >
-          <Text
-            style={[
-              styles.filterPillText,
-              mediaFilter === 'movie' && styles.filterPillTextActive,
-            ]}
-          >
-            Films
-          </Text>
-        </TvFocusable>
-
-        <TvFocusable
-          onFocus={handleTopFocus}
-          onPress={() => onMediaFilterChange?.('tv')}
-          scaleOnFocus={TV_FOCUS.scaleSmall}
-          borderRadius={999}
-          style={[styles.filterPill, mediaFilter === 'tv' && styles.filterPillActive]}
-        >
-          <Text
-            style={[styles.filterPillText, mediaFilter === 'tv' && styles.filterPillTextActive]}
-          >
-            TV Series
-          </Text>
-        </TvFocusable>
+        {[
+          { key: 'all', value: null, label: 'All Programme' },
+          { key: 'movie', value: 'movie', label: 'Films' },
+          { key: 'tv', value: 'tv', label: 'TV Series' },
+        ].map((facet) => {
+          const active = (mediaFilter || null) === facet.value;
+          return (
+            <TvFocusable
+              key={facet.key}
+              appearance="text"
+              onFocus={handleTopFocus}
+              onPress={() => onMediaFilterChange?.(facet.value)}
+              scaleOnFocus={TV_FOCUS.scaleSmall}
+              borderRadius={6}
+              style={styles.filterItem}
+            >
+              {({ focused }) => (
+                <View style={styles.filterItemInner}>
+                  <Text
+                    style={[
+                      styles.filterText,
+                      active && styles.filterTextActive,
+                      focused && styles.filterTextFocused,
+                    ]}
+                  >
+                    {facet.label}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
+            </TvFocusable>
+          );
+        })}
 
         {/* Language Quick Filters */}
         {availableLanguages.map((lang) => {
@@ -314,36 +291,57 @@ export function TvHomeScreen({
           return (
             <TvFocusable
               key={lang.code}
+              appearance="text"
               onFocus={handleTopFocus}
               onPress={() => setSelectedLang((prev) => (prev === lang.code ? null : lang.code))}
               scaleOnFocus={TV_FOCUS.scaleSmall}
-              borderRadius={999}
-              style={[styles.filterPill, active && styles.filterPillActive]}
+              borderRadius={6}
+              style={styles.filterItem}
             >
-              <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
-                {lang.label}
-              </Text>
+              {({ focused }) => (
+                <View style={styles.filterItemInner}>
+                  <Text
+                    style={[
+                      styles.filterText,
+                      active && styles.filterTextActive,
+                      focused && styles.filterTextFocused,
+                    ]}
+                  >
+                    {lang.label}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
             </TvFocusable>
           );
         })}
 
         <TvFocusable
+          appearance="text"
           onFocus={handleTopFocus}
           onPress={() => onNavigateTab?.('discover')}
           scaleOnFocus={TV_FOCUS.scaleSmall}
-          borderRadius={999}
-          style={styles.filterPill}
+          borderRadius={6}
+          style={styles.filterItem}
         >
-          <Text style={[styles.filterPillText, { color: GOLD_ACCENT }]}>Discover Filters</Text>
+          {({ focused }) => (
+            <Text
+              style={[
+                styles.filterText,
+                { color: GOLD_ACCENT },
+                focused && styles.filterTextFocused,
+              ]}
+            >
+              Discover Filters
+            </Text>
+          )}
         </TvFocusable>
       </View>
 
       {/* Top 10 Trending Swimlane (Ranked 10-Foot Rail) */}
       {filteredTrending.length > 0 ? (
         <TvContentRail
-          eyebrow="LIVE COMMUNITY PULSE"
           title="Top 10 Trending Now"
-          subtitle="Ranked by live watchers"
           data={filteredTrending.slice(0, 10)}
           showRank={true}
           savedKeys={savedKeys}
@@ -357,9 +355,7 @@ export function TvHomeScreen({
       {watchlistRails.map((rail) => (
         <TvContentRail
           key={rail.id}
-          eyebrow={rail.eyebrow}
           title={rail.title}
-          subtitle={rail.subtitle}
           data={rail.items}
           savedKeys={savedKeys}
           sortMode={rail.sortMode}
@@ -371,12 +367,10 @@ export function TvHomeScreen({
         />
       ))}
 
-      {/* Now Playing in Theaters */}
+      {/* Now Playing in Cinemas */}
       {filteredNowPlaying.length > 0 ? (
         <TvContentRail
-          eyebrow="IN THEATERS"
           title="Now Playing in Cinemas"
-          subtitle="Current theatrical releases"
           data={filteredNowPlaying}
           savedKeys={savedKeys}
           onSelectItem={onSelectItem}
@@ -388,9 +382,7 @@ export function TvHomeScreen({
       {/* IMDb Top 100 Ranked Swimlanes */}
       {imdbTopMovies.length > 0 ? (
         <TvContentRail
-          eyebrow="ALL-TIME CANON"
           title="IMDb Top 100 Films"
-          subtitle="Highest rated cinema classics"
           data={imdbTopMovies}
           showRank={true}
           savedKeys={savedKeys}
@@ -403,9 +395,7 @@ export function TvHomeScreen({
 
       {imdbTopTv.length > 0 ? (
         <TvContentRail
-          eyebrow="PRESTIGE TELEVISION"
           title="IMDb Top 100 TV Series"
-          subtitle="Highest rated television of all time"
           data={imdbTopTv}
           showRank={true}
           savedKeys={savedKeys}
@@ -420,13 +410,10 @@ export function TvHomeScreen({
       {awardRails.map((row, idx) => {
         const rowId = row.category?.id || row.id || `award-${idx}`;
         const rowTitle = row.category?.label || row.category?.fullName || row.title || 'Honors';
-        const rowEyebrow = row.category?.awardName || row.eyebrow || 'GLOBAL HONORS';
         return (
           <TvContentRail
             key={rowId}
-            eyebrow={rowEyebrow}
             title={rowTitle}
-            subtitle={`${row.items?.length || 0} winners`}
             data={(row.items || []).slice(0, 20)}
             savedKeys={savedKeys}
             onSeeAll={() => onNavigateTab?.('awards')}
@@ -452,30 +439,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 24,
+    gap: 14,
+    marginBottom: 22,
     paddingHorizontal: TV_SPACE.overscanX,
   },
-  filterPill: {
+  filterItem: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  filterPillActive: {
-    backgroundColor: GOLD_ACCENT,
+  filterItemInner: {
+    alignItems: 'center',
   },
-  filterPillText: {
-    color: '#E6E1D7',
-    fontFamily: fonts.label,
+  filterText: {
+    color: '#ABA59B',
+    fontFamily: fonts.heading,
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
-  filterPillTextActive: {
-    color: '#140F06',
+  filterTextActive: {
+    color: GOLD_ACCENT,
+    fontFamily: fonts.heading,
+    fontWeight: '700',
+  },
+  filterTextFocused: {
+    color: '#FFFFFF',
     fontFamily: fonts.heading,
     fontWeight: '800',
+  },
+  activeUnderline: {
+    backgroundColor: GOLD_ACCENT,
+    borderRadius: 1,
+    height: 2,
+    marginTop: 4,
+    width: '100%',
   },
 });

@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  TV_ACTIVE,
   TV_CARD,
   TV_FOCUS,
   TV_SELECTED,
@@ -14,13 +15,15 @@ import {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-test('tvTheme defines 10-foot focus, typography (>=13dp), spacing, and card tokens', () => {
-  assert.equal(TV_FOCUS.ringColor, '#FFF4DC');
-  assert.ok(TV_FOCUS.ringWidth >= 3);
+test('tvTheme defines restrained 10-foot focus, typography (>=13dp), spacing, and card tokens', () => {
+  assert.match(TV_FOCUS.ringColor, /rgba\(255,\s*244,\s*220/);
+  assert.ok(TV_FOCUS.ringWidth >= 2);
   assert.match(TV_FOCUS.glow, /rgba\(255,\s*244,\s*220/);
-  assert.ok(TV_FOCUS.scale >= 1.08);
-  assert.ok(TV_FOCUS.scaleSmall >= 1.05);
+  assert.ok(TV_FOCUS.scale >= 1.05 && TV_FOCUS.scale <= 1.08);
+  assert.ok(TV_FOCUS.scaleSmall >= 1.03 && TV_FOCUS.scaleSmall <= 1.06);
+  assert.match(TV_FOCUS.surface, /rgba\(255,\s*244,\s*220/);
 
+  assert.equal(TV_ACTIVE.text, '#D4A853');
   assert.equal(TV_SELECTED.fill, '#D4A853');
 
   assert.ok(TV_TYPE.MIN >= 13);
@@ -47,18 +50,53 @@ test('TvFocusable wraps Pressable in an outer scaling Animated.View with warm-wh
   );
 });
 
-test('TvSidebar overlays when expanded without shifting stage and distinguishes active tab from focus', () => {
+test('TvSidebar and TvTopNav expose text-only navigation and distinguish active tab from focus', () => {
   const src = read('src/tv/TvSidebar.js');
   assert.match(src, /railFootprint/);
   assert.match(src, /position:\s*'absolute'/);
   assert.match(src, /backdropScrim/);
   assert.match(src, /activeBar/);
+
+  const topNav = read('src/tv/TvTopNav.js');
+  assert.match(topNav, /TV_NAV_ITEMS/);
+  assert.match(topNav, /activeUnderline/);
 });
 
 test('TvContentRail aligns focused cards to fixed left keyline (viewPosition: 0) and reports railY', () => {
   const src = read('src/tv/TvContentRail.js');
   assert.match(src, /viewPosition:\s*0/);
   assert.match(src, /onRailFocus\?\.\(railYRef\.current\)/);
+});
+
+test('No TV screen or component imports icon fonts or renders eyebrow headers', () => {
+  const tvDir = path.join(root, 'src/tv');
+  const files = fs.readdirSync(tvDir).filter((f) => f.endsWith('.js'));
+
+  for (const file of files) {
+    const src = fs.readFileSync(path.join(tvDir, file), 'utf8');
+    assert.ok(
+      !src.includes('@expo/vector-icons') && !src.includes('Ionicons'),
+      `${file} must use clean text labels only (no Ionicons)`,
+    );
+    assert.ok(
+      !/eyebrow=/.test(src),
+      `${file} must not pass redundant eyebrow headers to rails or hero`,
+    );
+  }
+});
+
+test('TvPosterCard keeps poster artwork unobstructed and shows metadata only on focus', () => {
+  const src = read('src/tv/TvPosterCard.js');
+  assert.ok(!src.includes('LinearGradient'), 'TvPosterCard must not overlay gradient over poster');
+  assert.ok(!src.includes('bottomCaption'), 'TvPosterCard must not overlay caption text on poster');
+  assert.match(src, /isFocused\s*&&\s*metaParts\.length\s*>\s*0/);
+});
+
+test('TvHeroBillboard auto-rotates without manual Prev/Next controls or eyebrow header', () => {
+  const src = read('src/tv/TvHeroBillboard.js');
+  assert.ok(!src.includes('>Prev<') && !src.includes('>Next<'), 'No Prev/Next buttons on spotlight');
+  assert.ok(!src.includes('FEATURED SPOTLIGHT'), 'No FEATURED SPOTLIGHT eyebrow on spotlight');
+  assert.match(src, /setInterval/);
 });
 
 test('No TV screen or component declares a fontSize below 13dp (26px at 1080p)', () => {

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { TvFocusable } from './TvFocusable';
 import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
@@ -35,13 +34,11 @@ export function TvSettingsScreen({
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.eyebrow}>SYSTEM & TELEMETRY</Text>
-      <Text style={styles.title}>Trova TV Settings</Text>
+      <Text style={styles.title}>Settings</Text>
 
       <View style={styles.gridRow}>
-        {/* Left Card: TV Platform & Playback Engine */}
+        {/* Left Column: TV Platform & Playback Engine */}
         <View style={styles.card}>
-          <Text style={styles.cardEyebrow}>10-FOOT HARDWARE PROFILE</Text>
           <Text style={styles.cardTitle}>Sony BRAVIA 4K TV Edition</Text>
 
           <View style={styles.kvRow}>
@@ -67,25 +64,26 @@ export function TvSettingsScreen({
             </Text>
           </View>
 
-          <View style={{ marginTop: 14 }}>
+          <View style={{ marginTop: 14, alignItems: 'flex-start' }}>
             <TvFocusable
+              appearance="text"
               hasTVPreferredFocus={true}
               onPress={onClearRecent}
               scaleOnFocus={1.04}
-              borderRadius={10}
+              borderRadius={8}
               style={styles.actionBtn}
             >
-              <View style={styles.btnInner}>
-                <Ionicons name="trash-outline" size={15} color={GOLD_ACCENT} />
-                <Text style={styles.actionBtnText}>Clear Recently Viewed History</Text>
-              </View>
+              {({ focused }) => (
+                <Text style={[styles.actionBtnText, focused && styles.textFocused]}>
+                  Clear Recently Viewed History
+                </Text>
+              )}
             </TvFocusable>
           </View>
         </View>
 
-        {/* Right Card: Live API Quota Telemetry */}
+        {/* Right Column: Live API Quota Telemetry */}
         <View style={styles.card}>
-          <Text style={styles.cardEyebrow}>PROVIDER QUOTA TELEMETRY</Text>
           <Text style={styles.cardTitle}>Live API Status</Text>
 
           {providers.map((p) => {
@@ -96,14 +94,7 @@ export function TvSettingsScreen({
                 : 'Ready — awaiting first query');
             return (
               <View key={p.key} style={styles.quotaBlock}>
-                <View style={styles.quotaHeader}>
-                  <Ionicons
-                    name={p.state?.rateLimitedAt ? 'warning' : 'checkmark-circle'}
-                    size={15}
-                    color={p.state?.rateLimitedAt ? '#FF6961' : '#4CD964'}
-                  />
-                  <Text style={styles.quotaName}>{p.name}</Text>
-                </View>
+                <Text style={styles.quotaName}>{p.name}</Text>
                 <Text style={styles.quotaDetail}>{line}</Text>
               </View>
             );
@@ -122,14 +113,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 64,
     paddingHorizontal: TV_SPACE.overscanX,
-    paddingTop: 20,
-  },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
+    paddingTop: 14,
   },
   title: {
     color: '#F5EEE1',
@@ -140,23 +124,11 @@ const styles = StyleSheet.create({
   },
   gridRow: {
     flexDirection: 'row',
-    gap: 20,
+    gap: 32,
   },
   card: {
-    backgroundColor: '#0D0B07',
-    borderColor: '#25211B',
-    borderRadius: 14,
-    borderWidth: 1,
     flex: 1,
-    padding: 20,
-  },
-  cardEyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 3,
+    paddingVertical: 8,
   },
   cardTitle: {
     color: '#F5EEE1',
@@ -166,14 +138,12 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   kvRow: {
-    borderBottomColor: '#191610',
-    borderBottomWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 10,
   },
   kvKey: {
-    color: '#C7C1B7',
+    color: '#ABA59B',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
   },
@@ -185,18 +155,10 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     alignItems: 'center',
-    backgroundColor: '#191610',
-    borderColor: 'rgba(212, 168, 83, 0.4)',
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: TV_SPACE.targetMin,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  btnInner: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   actionBtnText: {
     color: GOLD_ACCENT,
@@ -204,15 +166,12 @@ const styles = StyleSheet.create({
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
-  quotaBlock: {
-    borderBottomColor: '#191610',
-    borderBottomWidth: 1,
-    paddingVertical: 12,
+  textFocused: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
-  quotaHeader: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
+  quotaBlock: {
+    paddingVertical: 10,
   },
   quotaName: {
     color: '#F5EEE1',

@@ -33,7 +33,6 @@ export function TvHeroBillboard({
   onPlayNow,
   onToggleWatchlist,
   onHeroFocus,
-  eyebrow = 'FEATURED SPOTLIGHT',
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [enrichedMap, setEnrichedMap] = useState({});
@@ -183,11 +182,6 @@ export function TvHeroBillboard({
         ) : null}
 
         <View style={styles.editorialCol}>
-          <Text style={styles.eyebrowText}>
-            {eyebrow}
-            {item.ceremonyName ? `  ·  ${item.ceremonyName}` : ''}
-          </Text>
-
           {titleLogo ? (
             <ExpoImage
               source={{ uri: titleLogo.url }}
@@ -217,78 +211,67 @@ export function TvHeroBillboard({
             </Text>
           ) : null}
 
-          {/* Seamless Borderless Action Row */}
+          {/* Clean Borderless Text Actions */}
           <View style={styles.ctaRow}>
             <TvFocusable
+              appearance="text"
               hasTVPreferredFocus={true}
               onFocus={onHeroFocus}
               onPress={() => (onPlayNow ? onPlayNow(item) : onSelectItem?.(item))}
               scaleOnFocus={TV_FOCUS.scaleSmall}
-              borderRadius={999}
-              style={styles.primaryBtn}
+              borderRadius={8}
+              style={styles.textBtn}
               accessibilityLabel={`Watch ${item.title || item.name} now`}
             >
-              <Text style={styles.primaryBtnText}>Watch Now</Text>
+              {({ focused }) => (
+                <Text style={[styles.textBtnLabel, focused && styles.textBtnLabelFocused]}>
+                  Watch Now
+                </Text>
+              )}
             </TvFocusable>
 
             <TvFocusable
+              appearance="text"
               onFocus={onHeroFocus}
               onPress={() => onSelectItem?.(item)}
               scaleOnFocus={TV_FOCUS.scaleSmall}
-              borderRadius={999}
-              style={styles.tonalBtn}
+              borderRadius={8}
+              style={styles.textBtn}
               accessibilityLabel={`More info for ${item.title || item.name}`}
             >
-              <Text style={styles.tonalBtnText}>More Info</Text>
+              {({ focused }) => (
+                <Text style={[styles.textBtnLabel, focused && styles.textBtnLabelFocused]}>
+                  More Info
+                </Text>
+              )}
             </TvFocusable>
 
             {onToggleWatchlist ? (
               <TvFocusable
+                appearance="text"
                 onFocus={onHeroFocus}
                 onPress={() => onToggleWatchlist(item)}
                 scaleOnFocus={TV_FOCUS.scaleSmall}
-                borderRadius={999}
-                style={styles.tonalBtn}
+                borderRadius={8}
+                style={styles.textBtn}
                 accessibilityLabel={
                   isSaved
                     ? `Remove ${item.title || item.name} from Watchlist`
                     : `Add ${item.title || item.name} to Watchlist`
                 }
               >
-                <Text style={[styles.tonalBtnText, isSaved && { color: GOLD_ACCENT }]}>
-                  {isSaved ? 'In Watchlist' : 'Add to Watchlist'}
-                </Text>
+                {({ focused }) => (
+                  <Text
+                    style={[
+                      styles.textBtnLabel,
+                      isSaved && { color: GOLD_ACCENT },
+                      focused && styles.textBtnLabelFocused,
+                    ]}
+                  >
+                    {isSaved ? 'In Watchlist' : 'Add to Watchlist'}
+                  </Text>
+                )}
               </TvFocusable>
-            ) : null}
-
-            {items.length > 1 ? (
-              <View style={styles.cycleGroup}>
-                <TvFocusable
-                  onFocus={onHeroFocus}
-                  onPress={() =>
-                    setActiveIndex((prev) => (prev - 1 + items.length) % items.length)
-                  }
-                  scaleOnFocus={TV_FOCUS.scaleSmall}
-                  borderRadius={999}
-                  style={styles.StepBtn}
-                  accessibilityLabel="Previous spotlight title"
-                >
-                  <Text style={styles.stepBtnText}>Prev</Text>
-                </TvFocusable>
-                <Text style={styles.counterText}>
-                  {safeIndex + 1} / {items.length}
-                </Text>
-                <TvFocusable
-                  onFocus={onHeroFocus}
-                  onPress={() => setActiveIndex((prev) => (prev + 1) % items.length)}
-                  scaleOnFocus={TV_FOCUS.scaleSmall}
-                  borderRadius={999}
-                  style={styles.StepBtn}
-                  accessibilityLabel="Next spotlight title"
-                >
-                  <Text style={styles.stepBtnText}>Next</Text>
-                </TvFocusable>
-              </View>
             ) : null}
           </View>
         </View>
@@ -338,15 +321,6 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: '72%',
   },
-  eyebrowText: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
   logoImage: {
     height: 62,
     marginBottom: 8,
@@ -362,14 +336,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   metaLine: {
-    color: '#E6CD9C',
+    color: '#D8D2C7',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
     fontWeight: '600',
     marginBottom: 8,
   },
   synopsis: {
-    color: '#DCD7CE',
+    color: '#C7C1B7',
     fontFamily: fonts.body,
     fontSize: TV_TYPE.body,
     lineHeight: 22,
@@ -379,61 +353,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
+    gap: 18,
   },
-  primaryBtn: {
+  textBtn: {
     alignItems: 'center',
-    backgroundColor: GOLD_ACCENT,
     justifyContent: 'center',
     minHeight: TV_SPACE.targetMin,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-  },
-  primaryBtnText: {
-    color: '#140F06',
-    fontFamily: fonts.heading,
-    fontSize: TV_TYPE.button,
-    fontWeight: '800',
-  },
-  tonalBtn: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.10)',
-    justifyContent: 'center',
-    minHeight: TV_SPACE.targetMin,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  tonalBtnText: {
-    color: '#F5EEE1',
-    fontFamily: fonts.heading,
-    fontSize: TV_TYPE.button,
-    fontWeight: '700',
-  },
-  cycleGroup: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
-    marginLeft: 6,
-  },
-  StepBtn: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
-    justifyContent: 'center',
-    minHeight: TV_SPACE.chipMin,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  stepBtnText: {
-    color: '#E1DDD7',
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.meta,
+  textBtnLabel: {
+    color: '#E6E1D7',
+    fontFamily: fonts.heading,
+    fontSize: TV_TYPE.button,
     fontWeight: '700',
   },
-  counterText: {
-    color: '#B5AFA4',
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.meta,
-    fontWeight: '600',
-    paddingHorizontal: 4,
+  textBtnLabelFocused: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
 });
