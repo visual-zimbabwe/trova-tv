@@ -9,6 +9,7 @@ import { fonts } from '../theme/tokens';
 import { resolveRatingValue } from '../lib/ratings';
 import { watchlistEntryKey } from '../lib/watchlistModel';
 import { fetchHeroSpotlightDetail } from '../lib/tmdb';
+import { TV_FOCUS, TV_SPACE, TV_TYPE } from './tvTheme';
 
 function formatHeroRuntime(minutes, mediaType) {
   if (!minutes || minutes <= 0) return null;
@@ -31,6 +32,7 @@ export function TvHeroBillboard({
   onSelectItem,
   onPlayNow,
   onToggleWatchlist,
+  onHeroFocus,
   eyebrow = 'FEATURED SPOTLIGHT',
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -219,10 +221,10 @@ export function TvHeroBillboard({
           <View style={styles.ctaRow}>
             <TvFocusable
               hasTVPreferredFocus={true}
+              onFocus={onHeroFocus}
               onPress={() => (onPlayNow ? onPlayNow(item) : onSelectItem?.(item))}
-              scaleOnFocus={1.04}
+              scaleOnFocus={TV_FOCUS.scaleSmall}
               borderRadius={999}
-              focusBorderColor="#FEFBF6"
               style={styles.primaryBtn}
               accessibilityLabel={`Watch ${item.title || item.name} now`}
             >
@@ -230,8 +232,9 @@ export function TvHeroBillboard({
             </TvFocusable>
 
             <TvFocusable
+              onFocus={onHeroFocus}
               onPress={() => onSelectItem?.(item)}
-              scaleOnFocus={1.04}
+              scaleOnFocus={TV_FOCUS.scaleSmall}
               borderRadius={999}
               style={styles.tonalBtn}
               accessibilityLabel={`More info for ${item.title || item.name}`}
@@ -241,8 +244,9 @@ export function TvHeroBillboard({
 
             {onToggleWatchlist ? (
               <TvFocusable
+                onFocus={onHeroFocus}
                 onPress={() => onToggleWatchlist(item)}
-                scaleOnFocus={1.04}
+                scaleOnFocus={TV_FOCUS.scaleSmall}
                 borderRadius={999}
                 style={styles.tonalBtn}
                 accessibilityLabel={
@@ -260,10 +264,11 @@ export function TvHeroBillboard({
             {items.length > 1 ? (
               <View style={styles.cycleGroup}>
                 <TvFocusable
+                  onFocus={onHeroFocus}
                   onPress={() =>
                     setActiveIndex((prev) => (prev - 1 + items.length) % items.length)
                   }
-                  scaleOnFocus={1.06}
+                  scaleOnFocus={TV_FOCUS.scaleSmall}
                   borderRadius={999}
                   style={styles.StepBtn}
                   accessibilityLabel="Previous spotlight title"
@@ -274,8 +279,9 @@ export function TvHeroBillboard({
                   {safeIndex + 1} / {items.length}
                 </Text>
                 <TvFocusable
+                  onFocus={onHeroFocus}
                   onPress={() => setActiveIndex((prev) => (prev + 1) % items.length)}
-                  scaleOnFocus={1.06}
+                  scaleOnFocus={TV_FOCUS.scaleSmall}
                   borderRadius={999}
                   style={styles.StepBtn}
                   accessibilityLabel="Next spotlight title"
@@ -293,9 +299,9 @@ export function TvHeroBillboard({
 
 const styles = StyleSheet.create({
   heroWrap: {
-    height: 312,
+    height: 332,
     justifyContent: 'flex-end',
-    marginBottom: 10,
+    marginBottom: 14,
     overflow: 'hidden',
     position: 'relative',
     width: '100%',
@@ -307,22 +313,22 @@ const styles = StyleSheet.create({
   foregroundRow: {
     alignItems: 'flex-end',
     flexDirection: 'row',
-    gap: 22,
-    paddingBottom: 16,
-    paddingHorizontal: 28,
+    gap: 24,
+    paddingBottom: 18,
+    paddingHorizontal: TV_SPACE.overscanX,
     zIndex: 5,
   },
   posterCard: {
     backgroundColor: '#0E0C09',
     borderRadius: 10,
     elevation: 10,
-    height: 198,
+    height: 210,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.6,
     shadowRadius: 16,
-    width: 132,
+    width: 140,
   },
   posterImage: {
     height: '100%',
@@ -330,12 +336,12 @@ const styles = StyleSheet.create({
   },
   editorialCol: {
     flex: 1,
-    maxWidth: '68%',
+    maxWidth: '72%',
   },
   eyebrowText: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: 10.5,
+    fontSize: TV_TYPE.eyebrow,
     fontWeight: '700',
     letterSpacing: 1.5,
     marginBottom: 6,
@@ -349,76 +355,85 @@ const styles = StyleSheet.create({
   heroTitle: {
     color: '#F5EEE1',
     fontFamily: fonts.display,
-    fontSize: 34,
+    fontSize: TV_TYPE.hero,
     fontWeight: '800',
     letterSpacing: -0.5,
     lineHeight: 39,
     marginBottom: 6,
   },
   metaLine: {
-    color: '#D5BA8A',
+    color: '#E6CD9C',
     fontFamily: fonts.label,
-    fontSize: 12.5,
+    fontSize: TV_TYPE.meta,
     fontWeight: '600',
     marginBottom: 8,
   },
   synopsis: {
-    color: '#C2BDB5',
+    color: '#DCD7CE',
     fontFamily: fonts.body,
-    fontSize: 13,
-    lineHeight: 19,
+    fontSize: TV_TYPE.body,
+    lineHeight: 22,
     marginBottom: 14,
   },
   ctaRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 14,
   },
   primaryBtn: {
+    alignItems: 'center',
     backgroundColor: GOLD_ACCENT,
-    paddingHorizontal: 20,
-    paddingVertical: 9,
+    justifyContent: 'center',
+    minHeight: TV_SPACE.targetMin,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
   },
   primaryBtnText: {
-    color: '#1A1204',
+    color: '#140F06',
     fontFamily: fonts.heading,
-    fontSize: 13,
+    fontSize: TV_TYPE.button,
     fontWeight: '800',
   },
   tonalBtn: {
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
-    paddingHorizontal: 16,
-    paddingVertical: 9,
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 238, 225, 0.10)',
+    justifyContent: 'center',
+    minHeight: TV_SPACE.targetMin,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   tonalBtnText: {
     color: '#F5EEE1',
     fontFamily: fonts.heading,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: TV_TYPE.button,
+    fontWeight: '700',
   },
   cycleGroup: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
     marginLeft: 6,
   },
   StepBtn: {
-    backgroundColor: 'rgba(245, 238, 225, 0.06)',
-    paddingHorizontal: 11,
-    paddingVertical: 6,
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 238, 225, 0.08)',
+    justifyContent: 'center',
+    minHeight: TV_SPACE.chipMin,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   stepBtnText: {
-    color: '#C2BDB5',
+    color: '#E1DDD7',
     fontFamily: fonts.label,
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: TV_TYPE.meta,
+    fontWeight: '700',
   },
   counterText: {
-    color: '#8E887E',
+    color: '#B5AFA4',
     fontFamily: fonts.label,
-    fontSize: 11,
+    fontSize: TV_TYPE.meta,
     fontWeight: '600',
-    paddingHorizontal: 2,
+    paddingHorizontal: 4,
   },
 });

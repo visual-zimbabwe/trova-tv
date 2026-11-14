@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TvHeroBillboard } from './TvHeroBillboard';
 import { TvContentRail } from './TvContentRail';
 import { TvFocusable } from './TvFocusable';
 import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
+import { TV_FOCUS, TV_SPACE, TV_TYPE } from './tvTheme';
 import {
   getAvailableWatchlistLanguages,
   getUserWatchlistCollections,
@@ -36,10 +37,21 @@ export function TvHomeScreen({
   onToggleWatchlist,
   onNavigateTab,
 }) {
+  const scrollRef = useRef(null);
   const [selectedLang, setSelectedLang] = useState(null);
   const [railSortPrefs, setRailSortPrefs] = useState({});
   const [trending, setTrending] = useState([]);
   const [nowPlaying, setNowPlaying] = useState([]);
+
+  const handleTopFocus = useCallback(() => {
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  }, []);
+
+  const handleRailFocus = useCallback((railY) => {
+    if (typeof railY === 'number') {
+      scrollRef.current?.scrollTo({ y: Math.max(0, railY - 120), animated: true });
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -235,6 +247,7 @@ export function TvHomeScreen({
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.scroll}
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
@@ -247,13 +260,15 @@ export function TvHomeScreen({
         onSelectItem={onSelectItem}
         onPlayNow={onPlayNow}
         onToggleWatchlist={onToggleWatchlist}
+        onHeroFocus={handleTopFocus}
       />
 
       {/* Seamless Borderless Facet Filter Bar */}
       <View style={styles.filterBar}>
         <TvFocusable
+          onFocus={handleTopFocus}
           onPress={() => onMediaFilterChange?.(null)}
-          scaleOnFocus={1.04}
+          scaleOnFocus={TV_FOCUS.scaleSmall}
           borderRadius={999}
           style={[styles.filterPill, !mediaFilter && styles.filterPillActive]}
         >
@@ -263,8 +278,9 @@ export function TvHomeScreen({
         </TvFocusable>
 
         <TvFocusable
+          onFocus={handleTopFocus}
           onPress={() => onMediaFilterChange?.('movie')}
-          scaleOnFocus={1.04}
+          scaleOnFocus={TV_FOCUS.scaleSmall}
           borderRadius={999}
           style={[styles.filterPill, mediaFilter === 'movie' && styles.filterPillActive]}
         >
@@ -279,8 +295,9 @@ export function TvHomeScreen({
         </TvFocusable>
 
         <TvFocusable
+          onFocus={handleTopFocus}
           onPress={() => onMediaFilterChange?.('tv')}
-          scaleOnFocus={1.04}
+          scaleOnFocus={TV_FOCUS.scaleSmall}
           borderRadius={999}
           style={[styles.filterPill, mediaFilter === 'tv' && styles.filterPillActive]}
         >
@@ -297,8 +314,9 @@ export function TvHomeScreen({
           return (
             <TvFocusable
               key={lang.code}
+              onFocus={handleTopFocus}
               onPress={() => setSelectedLang((prev) => (prev === lang.code ? null : lang.code))}
-              scaleOnFocus={1.04}
+              scaleOnFocus={TV_FOCUS.scaleSmall}
               borderRadius={999}
               style={[styles.filterPill, active && styles.filterPillActive]}
             >
@@ -310,8 +328,9 @@ export function TvHomeScreen({
         })}
 
         <TvFocusable
+          onFocus={handleTopFocus}
           onPress={() => onNavigateTab?.('discover')}
-          scaleOnFocus={1.04}
+          scaleOnFocus={TV_FOCUS.scaleSmall}
           borderRadius={999}
           style={styles.filterPill}
         >
@@ -330,6 +349,7 @@ export function TvHomeScreen({
           savedKeys={savedKeys}
           onSelectItem={onSelectItem}
           onToggleWatchlist={onToggleWatchlist}
+          onRailFocus={handleRailFocus}
         />
       ) : null}
 
@@ -347,6 +367,7 @@ export function TvHomeScreen({
           onSeeAll={() => onNavigateTab?.('watchlist')}
           onSelectItem={onSelectItem}
           onToggleWatchlist={onToggleWatchlist}
+          onRailFocus={handleRailFocus}
         />
       ))}
 
@@ -360,6 +381,7 @@ export function TvHomeScreen({
           savedKeys={savedKeys}
           onSelectItem={onSelectItem}
           onToggleWatchlist={onToggleWatchlist}
+          onRailFocus={handleRailFocus}
         />
       ) : null}
 
@@ -375,6 +397,7 @@ export function TvHomeScreen({
           onSeeAll={() => onNavigateTab?.('collections')}
           onSelectItem={onSelectItem}
           onToggleWatchlist={onToggleWatchlist}
+          onRailFocus={handleRailFocus}
         />
       ) : null}
 
@@ -389,6 +412,7 @@ export function TvHomeScreen({
           onSeeAll={() => onNavigateTab?.('collections')}
           onSelectItem={onSelectItem}
           onToggleWatchlist={onToggleWatchlist}
+          onRailFocus={handleRailFocus}
         />
       ) : null}
 
@@ -408,6 +432,7 @@ export function TvHomeScreen({
             onSeeAll={() => onNavigateTab?.('awards')}
             onSelectItem={onSelectItem}
             onToggleWatchlist={onToggleWatchlist}
+            onRailFocus={handleRailFocus}
           />
         );
       })}
@@ -421,32 +446,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 48,
+    paddingBottom: 64,
   },
   filterBar: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
-    paddingHorizontal: 28,
+    gap: 12,
+    marginBottom: 24,
+    paddingHorizontal: TV_SPACE.overscanX,
   },
   filterPill: {
-    backgroundColor: 'rgba(245, 238, 225, 0.06)',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 238, 225, 0.08)',
+    justifyContent: 'center',
+    minHeight: TV_SPACE.chipMin,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
   },
   filterPillActive: {
     backgroundColor: GOLD_ACCENT,
   },
   filterPillText: {
-    color: '#D8D3C8',
+    color: '#E6E1D7',
     fontFamily: fonts.label,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: TV_TYPE.meta,
+    fontWeight: '700',
   },
   filterPillTextActive: {
-    color: '#1A1204',
+    color: '#140F06',
     fontFamily: fonts.heading,
     fontWeight: '800',
   },

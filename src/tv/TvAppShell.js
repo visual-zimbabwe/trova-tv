@@ -17,6 +17,7 @@ import { launchStream } from '../lib/streamLauncher';
 import { trovaToast as toastiva } from '../lib/trovaToast';
 import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
+import { TV_TYPE } from './tvTheme';
 
 /**
  * Pure state reducer helper exported for unit testing (`tests/tvNavigation.test.js`).
@@ -321,13 +322,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(212, 168, 83, 0.18)',
     borderBottomColor: GOLD_ACCENT,
     borderBottomWidth: 1,
-    paddingHorizontal: 24,
-    paddingVertical: 5,
+    paddingHorizontal: 28,
+    paddingVertical: 7,
   },
   offlineText: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: 11.5,
+    fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
 });

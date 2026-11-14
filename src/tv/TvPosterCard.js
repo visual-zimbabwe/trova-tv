@@ -6,6 +6,7 @@ import { MediaArtwork } from '../components/MediaArtwork';
 import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
 import { resolveRatingValue } from '../lib/ratings';
+import { TV_CARD, TV_FOCUS, TV_TYPE } from './tvTheme';
 
 function formatCardRating(item) {
   const val = resolveRatingValue(item);
@@ -19,8 +20,8 @@ function formatCardRating(item) {
 
 /**
  * 10-Foot TV Poster / Backdrop / Ranked Card.
- * Borderless edge-to-edge artwork that blends seamlessly onto the dark canvas,
- * elevating smoothly on D-pad focus without cluttered badges or icon boxes.
+ * Spacious artwork card that lifts with a warm-white focus ring and halo glow,
+ * high-contrast 10-foot typography (>= 13-15dp), and non-overlapping rank numerals.
  */
 export const TvPosterCard = memo(function TvPosterCard({
   item,
@@ -38,8 +39,20 @@ export const TvPosterCard = memo(function TvPosterCard({
   const isCompact = variant === 'compact';
   const isGrid = variant === 'grid';
 
-  const cardWidth = isBackdrop ? 236 : isCompact ? 124 : isGrid ? 142 : 138;
-  const cardHeight = isBackdrop ? 133 : isCompact ? 186 : isGrid ? 213 : 207;
+  const cardWidth = isBackdrop
+    ? TV_CARD.backdropW
+    : isCompact
+      ? TV_CARD.compactW
+      : isGrid
+        ? TV_CARD.gridW
+        : TV_CARD.posterW;
+  const cardHeight = isBackdrop
+    ? TV_CARD.backdropH
+    : isCompact
+      ? TV_CARD.compactH
+      : isGrid
+        ? TV_CARD.gridH
+        : TV_CARD.posterH;
 
   const imageUri = isBackdrop
     ? item.backdropUrl || item.posterUrl || item.Poster
@@ -55,6 +68,9 @@ export const TvPosterCard = memo(function TvPosterCard({
     saved ? 'Saved' : null,
   ].filter(Boolean);
 
+  const innerW = cardWidth - TV_FOCUS.ringWidth * 2;
+  const innerH = cardHeight - TV_FOCUS.ringWidth * 2;
+
   return (
     <View style={[styles.wrap, rank != null ? styles.rankedWrap : null]}>
       {rank != null ? (
@@ -69,15 +85,16 @@ export const TvPosterCard = memo(function TvPosterCard({
           onLongPress={onLongPress ? () => onLongPress(item) : undefined}
           onFocus={onFocus}
           hasTVPreferredFocus={hasTVPreferredFocus}
-          scaleOnFocus={1.06}
-          borderRadius={10}
+          scaleOnFocus={TV_FOCUS.scale}
+          focusBackgroundColor="#0C0A07"
+          borderRadius={12}
           style={[styles.cardFrame, { width: cardWidth, height: cardHeight }]}
           accessibilityLabel={`${item.title || item.name}${yearLabel ? `, ${yearLabel}` : ''}${
             ratingLabel ? `, rated ${ratingLabel}` : ''
           }`}
         >
           {({ focused }) => (
-            <View style={[styles.artworkContainer, { width: cardWidth - 4, height: cardHeight - 4 }]}>
+            <View style={[styles.artworkContainer, { width: innerW, height: innerH }]}>
               <MediaArtwork
                 uri={imageUri}
                 title={item.title || item.name}
@@ -86,8 +103,12 @@ export const TvPosterCard = memo(function TvPosterCard({
               />
 
               <LinearGradient
-                colors={['transparent', 'rgba(4,3,1,0.18)', 'rgba(4,3,1,0.92)']}
-                locations={[0, 0.52, 1]}
+                colors={
+                  focused
+                    ? ['transparent', 'rgba(4,3,1,0.34)', 'rgba(4,3,1,0.96)']
+                    : ['transparent', 'rgba(4,3,1,0.22)', 'rgba(4,3,1,0.92)']
+                }
+                locations={[0, 0.48, 1]}
                 style={StyleSheet.absoluteFill}
               />
 
@@ -105,7 +126,10 @@ export const TvPosterCard = memo(function TvPosterCard({
                   {item.title || item.name}
                 </Text>
                 {metaParts.length > 0 ? (
-                  <Text numberOfLines={1} style={styles.metaText}>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.metaText, focused && styles.metaTextFocused]}
+                  >
                     {metaParts.join(' · ')}
                   </Text>
                 ) : null}
@@ -124,20 +148,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   rankedWrap: {
-    paddingLeft: 30,
+    paddingLeft: 44,
   },
   rankBadgeWrap: {
-    bottom: 6,
-    left: 2,
+    bottom: 8,
+    left: 0,
     position: 'absolute',
+    width: 42,
+    alignItems: 'center',
     zIndex: 2,
   },
   rankNumeral: {
-    color: 'rgba(212, 168, 83, 0.62)',
+    color: 'rgba(212, 168, 83, 0.82)',
     fontFamily: fonts.display,
-    fontSize: 62,
+    fontSize: 56,
     fontWeight: '800',
-    lineHeight: 66,
+    lineHeight: 60,
     textShadowColor: '#040301',
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 8,
@@ -147,37 +173,40 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   artworkContainer: {
-    borderRadius: 8,
+    borderRadius: 9,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   bottomCaption: {
-    paddingHorizontal: 9,
-    paddingBottom: 8,
-    paddingTop: 18,
+    paddingHorizontal: 11,
+    paddingBottom: 10,
+    paddingTop: 22,
   },
   honorEyebrow: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: 9,
+    fontSize: TV_TYPE.eyebrow,
     fontWeight: '700',
     letterSpacing: 0.6,
-    marginBottom: 1,
+    marginBottom: 2,
     textTransform: 'uppercase',
   },
   titleText: {
     color: '#F5EEE1',
     fontFamily: fonts.heading,
-    fontSize: 12,
+    fontSize: TV_TYPE.cardTitle,
     fontWeight: '700',
   },
   titleTextFocused: {
-    color: GOLD_ACCENT,
+    color: '#FFFFFF',
   },
   metaText: {
-    color: '#A39E94',
+    color: '#C7C1B7',
     fontFamily: fonts.body,
-    fontSize: 10,
-    marginTop: 1,
+    fontSize: TV_TYPE.meta,
+    marginTop: 2,
+  },
+  metaTextFocused: {
+    color: '#F5EEE1',
   },
 });
