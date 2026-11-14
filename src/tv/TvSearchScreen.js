@@ -346,23 +346,23 @@ const styles = StyleSheet.create({
   leftKeyboardPane: {
     backgroundColor: '#040301',
     paddingHorizontal: TV_SPACE.overscanX,
-    paddingVertical: 14,
-    width: 320,
+    paddingVertical: 10,
+    width: 380,
   },
   paneTitle: {
     color: '#F5EEE1',
     fontFamily: fonts.display,
     fontSize: TV_TYPE.h1,
     fontWeight: '800',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   queryBox: {
     alignItems: 'center',
     borderBottomColor: 'rgba(245, 238, 225, 0.22)',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    height: 44,
-    marginBottom: 12,
+    height: 40,
+    marginBottom: 8,
     paddingHorizontal: 4,
   },
   queryInput: {
@@ -373,13 +373,15 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   specialKeysRow: {
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
+    height: 36,
     marginBottom: 8,
   },
   specialKey: {
     alignItems: 'center',
-    height: 38,
+    height: 36,
     justifyContent: 'center',
   },
   specialKeyText: {
@@ -391,14 +393,14 @@ const styles = StyleSheet.create({
   keyGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
+    gap: 5,
+    marginBottom: 8,
   },
   keyCell: {
     alignItems: 'center',
-    height: 36,
+    height: 33,
     justifyContent: 'center',
-    width: 39,
+    width: 47,
   },
   keyText: {
     color: '#D8D2C7',
@@ -413,14 +415,14 @@ const styles = StyleSheet.create({
   quickChipsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 5,
   },
   quickChip: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 34,
+    minHeight: 28,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   quickChipText: {
     color: '#ABA59B',

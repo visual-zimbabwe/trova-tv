@@ -77,7 +77,20 @@ export function TvFocusable({
   );
 
   const flatStyle = StyleSheet.flatten(style) || {};
-  const outerFlex = flatStyle.flex != null ? { flex: flatStyle.flex } : null;
+  const outerFlex = {};
+  if (flatStyle.flex != null) outerFlex.flex = flatStyle.flex;
+  if (flatStyle.flexGrow != null) outerFlex.flexGrow = flatStyle.flexGrow;
+  if (flatStyle.flexShrink != null) outerFlex.flexShrink = flatStyle.flexShrink;
+  if (flatStyle.flexBasis != null) outerFlex.flexBasis = flatStyle.flexBasis;
+  const hasOuterFlex = Object.keys(outerFlex).length > 0;
+
+  const {
+    flex: _flex,
+    flexGrow: _flexGrow,
+    flexShrink: _flexShrink,
+    flexBasis: _flexBasis,
+    ...innerStyle
+  } = flatStyle;
 
   const resolvedFocusBg =
     focusBackgroundColor !== undefined
@@ -89,7 +102,7 @@ export function TvFocusable({
   return (
     <Animated.View
       style={[
-        outerFlex,
+        hasOuterFlex ? outerFlex : null,
         effectiveScale !== 1 ? { transform: [{ scale: scaleAnim }] } : null,
         focused && styles.lifted,
       ]}
@@ -109,7 +122,7 @@ export function TvFocusable({
         style={({ pressed }) => [
           styles.base,
           { borderRadius, borderWidth: resolvedBorderWidth },
-          style,
+          innerStyle,
           focused && {
             borderColor: focusBorderColor,
             borderWidth: resolvedBorderWidth,
