@@ -1,34 +1,27 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
 import { TvFocusable } from './TvFocusable';
 import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
 import { TV_FOCUS, TV_SPACE, TV_TYPE } from './tvTheme';
 
 export const TV_NAV_ITEMS = [
-  { key: 'search', label: 'Search', icon: 'search-outline', activeIcon: 'search' },
-  { key: 'home', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
-  { key: 'movies', label: 'Movies', icon: 'film-outline', activeIcon: 'film' },
-  { key: 'tv', label: 'TV Shows', icon: 'tv-outline', activeIcon: 'tv' },
-  { key: 'collections', label: 'Collections', icon: 'albums-outline', activeIcon: 'albums' },
-  { key: 'awards', label: 'Honors', icon: 'trophy-outline', activeIcon: 'trophy' },
-  { key: 'discover', label: 'Discover', icon: 'compass-outline', activeIcon: 'compass' },
-  { key: 'watchlist', label: 'Watchlist', icon: 'bookmark-outline', activeIcon: 'bookmark' },
-  {
-    key: 'downloads',
-    label: 'Downloads',
-    icon: 'cloud-download-outline',
-    activeIcon: 'cloud-download',
-  },
-  { key: 'settings', label: 'Settings', icon: 'settings-outline', activeIcon: 'settings' },
+  { key: 'search', label: 'Search' },
+  { key: 'home', label: 'Home' },
+  { key: 'movies', label: 'Movies' },
+  { key: 'tv', label: 'TV Shows' },
+  { key: 'collections', label: 'Collections' },
+  { key: 'awards', label: 'Honors' },
+  { key: 'discover', label: 'Discover' },
+  { key: 'watchlist', label: 'Watchlist' },
+  { key: 'downloads', label: 'Downloads' },
+  { key: 'settings', label: 'Settings' },
 ];
 
 /**
- * 10-Foot Overlay Left Navigation Rail.
- * Reserves a fixed 68dp collapsed footprint so expanding to 240dp overlays the stage
- * without pushing or reflowing content. Entering the rail from the stage lands on `activeTab`.
+ * 10-Foot Overlay Left Navigation Rail (Text-Only).
+ * Preserved for compatibility; primary shell uses TvTopNav.
  */
 export function TvSidebar({
   activeTab = 'home',
@@ -81,15 +74,10 @@ export function TvSidebar({
           expanded ? styles.sidebarExpanded : styles.sidebarCollapsed,
         ]}
       >
-        {/* Brand Wordmark */}
         <View style={styles.brandHeader}>
-          <View style={styles.brandDiamond}>
-            <Text style={styles.brandMonogram}>T</Text>
-          </View>
-          {expanded ? <Text style={styles.brandWordmark}>Trova</Text> : null}
+          <Text style={styles.brandWordmark}>{expanded ? 'Trova' : 'T'}</Text>
         </View>
 
-        {/* Navigation Items */}
         <View style={styles.navList}>
           {TV_NAV_ITEMS.map((item) => {
             const isActive = activeTab === item.key;
@@ -103,61 +91,39 @@ export function TvSidebar({
             return (
               <TvFocusable
                 key={item.key}
+                appearance="text"
                 focusKey={item.key}
                 onFocus={() => handleItemFocus(item.key)}
                 onBlur={() => handleItemBlur(item.key)}
                 onPress={() => onSelectTab?.(item.key)}
                 scaleOnFocus={TV_FOCUS.scaleSmall}
-                borderRadius={12}
-                focusBackgroundColor={TV_FOCUS.surface}
+                borderRadius={8}
                 style={styles.navItem}
                 accessibilityLabel={item.label}
               >
                 {({ focused }) => (
                   <View style={styles.navItemInner}>
                     {isActive ? <View style={styles.activeBar} /> : null}
-                    <View style={styles.iconWrap}>
-                      <Ionicons
-                        name={isActive || focused ? item.activeIcon : item.icon}
-                        size={22}
-                        color={
-                          focused
-                            ? '#FFF4DC'
-                            : isActive
-                              ? GOLD_ACCENT
-                              : '#9E988E'
-                        }
-                      />
+                    <View style={styles.labelRow}>
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.navLabel,
+                          isActive && styles.navLabelActive,
+                          focused && styles.navLabelFocused,
+                        ]}
+                      >
+                        {expanded ? item.label : item.label.slice(0, 2)}
+                      </Text>
+                      {expanded && badge ? (
+                        <Text style={styles.badgeText}>{badge}</Text>
+                      ) : null}
                     </View>
-                    {expanded ? (
-                      <View style={styles.labelRow}>
-                        <Text
-                          numberOfLines={1}
-                          style={[
-                            styles.navLabel,
-                            isActive && styles.navLabelActive,
-                            focused && styles.navLabelFocused,
-                          ]}
-                        >
-                          {item.label}
-                        </Text>
-                        {badge ? (
-                          <View style={styles.badgePill}>
-                            <Text style={styles.badgeText}>{badge}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    ) : null}
                   </View>
                 )}
               </TvFocusable>
             );
           })}
-        </View>
-
-        {/* Footer Status */}
-        <View style={styles.footer}>
-          {expanded ? <Text style={styles.footerText}>TROVA 4K TV</Text> : null}
         </View>
       </View>
     </View>

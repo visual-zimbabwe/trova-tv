@@ -1,6 +1,5 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { TvFocusable } from './TvFocusable';
 import { MediaArtwork } from '../components/MediaArtwork';
 import { GOLD_ACCENT } from '../theme/programme';
@@ -33,10 +32,7 @@ export function TvDownloadsScreen({ onNavigateTab }) {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerBlock}>
-        <View>
-          <Text style={styles.eyebrow}>OFFLINE CINEMA VAULT</Text>
-          <Text style={styles.title}>Downloads & Storage ({downloads.length})</Text>
-        </View>
+        <Text style={styles.title}>Downloads ({downloads.length})</Text>
 
         <View style={styles.storageBox}>
           <Text style={styles.storageLabel}>
@@ -50,20 +46,24 @@ export function TvDownloadsScreen({ onNavigateTab }) {
 
       {downloads.length === 0 ? (
         <View style={styles.emptyBox}>
-          <Ionicons name="cloud-download-outline" size={42} color={GOLD_ACCENT} />
           <Text style={styles.emptyTitle}>No offline downloads yet</Text>
           <Text style={styles.emptySub}>
-            Open any Movie or TV Episode and select “Download Offline” to save high-bitrate video
+            Open any Movie or TV Episode and select “Download” to save high-bitrate video
             directly to your TV storage for zero-buffering playback.
           </Text>
           <TvFocusable
+            appearance="text"
             hasTVPreferredFocus={true}
             onPress={() => onNavigateTab?.('home')}
-            scaleOnFocus={1.05}
-            borderRadius={999}
+            scaleOnFocus={1.04}
+            borderRadius={8}
             style={styles.browseBtn}
           >
-            <Text style={styles.browseBtnText}>Browse Programme</Text>
+            {({ focused }) => (
+              <Text style={[styles.browseBtnText, focused && styles.textFocused]}>
+                Browse Programme
+              </Text>
+            )}
           </TvFocusable>
         </View>
       ) : (
@@ -87,9 +87,9 @@ export function TvDownloadsScreen({ onNavigateTab }) {
                     {dl.releaseName}
                   </Text>
                   <Text style={styles.dlStatus}>
-                    {String(dl.state || 'downloading').toUpperCase()} • {pct}% •{' '}
+                    {String(dl.state || 'downloading').toUpperCase()} · {pct}% ·{' '}
                     {formatBytes(dl.downloadedBytes || 0)} / {formatBytes(dl.totalBytes || 0)}
-                    {dl.state === 'downloading' ? ` • ${formatSpeed(dl.speed || 0)}` : ''}
+                    {dl.state === 'downloading' ? ` · ${formatSpeed(dl.speed || 0)}` : ''}
                   </Text>
                   <View style={styles.dlTrack}>
                     <View style={[styles.dlFill, { width: `${pct}%` }]} />
@@ -98,42 +98,66 @@ export function TvDownloadsScreen({ onNavigateTab }) {
 
                 <View style={styles.dlActions}>
                   <TvFocusable
+                    appearance="text"
                     hasTVPreferredFocus={idx === 0}
                     onPress={() => playDownloaded(dl)}
-                    scaleOnFocus={1.05}
-                    borderRadius={999}
+                    scaleOnFocus={1.04}
+                    borderRadius={6}
                     style={styles.goldBtn}
                   >
-                    <Text style={styles.goldBtnText}>Play</Text>
+                    {({ focused }) => (
+                      <Text style={[styles.goldBtnText, focused && styles.textFocused]}>Play</Text>
+                    )}
                   </TvFocusable>
 
                   {dl.state === 'downloading' ? (
                     <TvFocusable
+                      appearance="text"
                       onPress={() => pauseDownload(dl.id)}
-                      scaleOnFocus={1.05}
-                      borderRadius={999}
+                      scaleOnFocus={1.04}
+                      borderRadius={6}
                       style={styles.outlineBtn}
                     >
-                      <Text style={styles.outlineBtnText}>Pause</Text>
+                      {({ focused }) => (
+                        <Text style={[styles.outlineBtnText, focused && styles.textFocused]}>
+                          Pause
+                        </Text>
+                      )}
                     </TvFocusable>
                   ) : dl.state === 'paused' ? (
                     <TvFocusable
+                      appearance="text"
                       onPress={() => resumeDownload(dl.id)}
-                      scaleOnFocus={1.05}
-                      borderRadius={999}
+                      scaleOnFocus={1.04}
+                      borderRadius={6}
                       style={styles.outlineBtn}
                     >
-                      <Text style={styles.outlineBtnText}>Resume</Text>
+                      {({ focused }) => (
+                        <Text style={[styles.outlineBtnText, focused && styles.textFocused]}>
+                          Resume
+                        </Text>
+                      )}
                     </TvFocusable>
                   ) : null}
 
                   <TvFocusable
+                    appearance="text"
                     onPress={() => deleteDownload(dl.id)}
-                    scaleOnFocus={1.05}
-                    borderRadius={999}
+                    scaleOnFocus={1.04}
+                    borderRadius={6}
                     style={styles.outlineBtn}
                   >
-                    <Text style={[styles.outlineBtnText, { color: '#FF6961' }]}>Delete</Text>
+                    {({ focused }) => (
+                      <Text
+                        style={[
+                          styles.outlineBtnText,
+                          { color: '#FF6961' },
+                          focused && styles.textFocused,
+                        ]}
+                      >
+                        Delete
+                      </Text>
+                    )}
                   </TvFocusable>
                 </View>
               </View>
@@ -153,20 +177,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 64,
     paddingHorizontal: TV_SPACE.overscanX,
-    paddingTop: 20,
+    paddingTop: 14,
   },
   headerBlock: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 20,
-  },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
   },
   title: {
     color: '#F5EEE1',
@@ -175,16 +192,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   storageBox: {
-    backgroundColor: '#0D0B07',
-    borderColor: '#25211B',
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    width: 300,
+    width: 280,
   },
   storageLabel: {
-    color: '#E6CD9C',
+    color: '#D8D2C7',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
     marginBottom: 6,
@@ -192,7 +203,7 @@ const styles = StyleSheet.create({
   gaugeTrack: {
     backgroundColor: '#25211B',
     borderRadius: 4,
-    height: 6,
+    height: 4,
     overflow: 'hidden',
   },
   gaugeFill: {
@@ -201,10 +212,6 @@ const styles = StyleSheet.create({
   },
   emptyBox: {
     alignItems: 'center',
-    backgroundColor: '#0D0B07',
-    borderColor: '#25211B',
-    borderRadius: 14,
-    borderWidth: 1,
     marginTop: 24,
     padding: 40,
   },
@@ -226,17 +233,20 @@ const styles = StyleSheet.create({
   },
   browseBtn: {
     alignItems: 'center',
-    backgroundColor: GOLD_ACCENT,
     justifyContent: 'center',
     marginTop: 20,
     minHeight: TV_SPACE.targetMin,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
   },
   browseBtnText: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
     fontFamily: fonts.heading,
     fontSize: TV_TYPE.button,
+    fontWeight: '800',
+  },
+  textFocused: {
+    color: '#FFFFFF',
     fontWeight: '800',
   },
   listWrap: {
@@ -244,13 +254,9 @@ const styles = StyleSheet.create({
   },
   dlCard: {
     alignItems: 'center',
-    backgroundColor: '#0D0B07',
-    borderColor: '#25211B',
-    borderRadius: 12,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 18,
-    padding: 14,
+    paddingVertical: 12,
   },
   poster: {
     borderRadius: 8,
@@ -282,7 +288,7 @@ const styles = StyleSheet.create({
   dlTrack: {
     backgroundColor: '#25211B',
     borderRadius: 4,
-    height: 6,
+    height: 4,
     overflow: 'hidden',
   },
   dlFill: {
@@ -291,34 +297,30 @@ const styles = StyleSheet.create({
   },
   dlActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
   goldBtn: {
     alignItems: 'center',
-    backgroundColor: GOLD_ACCENT,
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   goldBtnText: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
     fontFamily: fonts.heading,
     fontSize: TV_TYPE.meta,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   outlineBtn: {
     alignItems: 'center',
-    backgroundColor: '#191610',
-    borderColor: '#312D27',
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   outlineBtnText: {
-    color: '#F5EEE1',
+    color: '#D8D2C7',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
     fontWeight: '700',

@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, StyleSheet, Text, View } from 'react-native';
-import { TvSidebar } from './TvSidebar';
+import { TvTopNav } from './TvTopNav';
 import { TvHomeScreen } from './TvHomeScreen';
 import { TvDetailScreen } from './TvDetailScreen';
 import { TvSearchScreen } from './TvSearchScreen';
@@ -15,9 +15,10 @@ import { useDownloads } from '../lib/downloadManager';
 import { searchMovieTorrents } from '../lib/torrentSearchEngine';
 import { launchStream } from '../lib/streamLauncher';
 import { trovaToast as toastiva } from '../lib/trovaToast';
+import { useToastContext } from '../context/ToastContext';
 import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
-import { TV_TYPE } from './tvTheme';
+import { TV_SPACE, TV_TYPE } from './tvTheme';
 
 /**
  * Pure state reducer helper exported for unit testing (`tests/tvNavigation.test.js`).
@@ -30,8 +31,8 @@ export function resolveTvTabFilter(tabKey) {
 
 /**
  * S01: 10-Foot App Shell.
- * Orchestrates the Left Navigation Rail (`TvSidebar`), the active 16:9 content stage,
- * stacked Detail / Filmography overlays, and Sony TV remote Back button navigation.
+ * Orchestrates the Top Horizontal Text Navigation (`TvTopNav`), the active 16:9 content stage,
+ * stacked Detail / Filmography overlays, non-intrusive TV toast notifications, and Sony TV remote Back navigation.
  */
 export function TvAppShell({
   watchlistCtl,
@@ -44,6 +45,20 @@ export function TvAppShell({
 }) {
   const [activeTab, setActiveTab] = useState('home');
   const [overlayStack, setOverlayStack] = useState([]); // [{ type: 'detail', pushId } | { type: 'person', person }]
+  const activeTabRef = useRef(activeTab);
+  const overlayStackRef = useRef(overlayStack);
+  const releaseDetailRef = useRef(detailCtl?.releaseDetail);
+  activeTabRef.current = activeTab;
+  overlayStackRef.current = overlayStack;
+  releaseDetailRef.current = detailCtl?.releaseDetail;
+
+  let currentToast = null;
+  try {
+    const toastCtx = useToastContext();
+    currentToast = toastCtx?.currentToast || null;
+  } catch {
+    currentToast = null;
+  }
 
   const { downloads = [] } = useDownloads();
   const activeDownloadCount = useMemo(
@@ -59,6 +74,9 @@ export function TvAppShell({
     if (Array.isArray(raw)) return new Set(raw);
     return new Set();
   }, [watchlistCtl?.savedWatchlistKeys]);
+
+  const handleToggleWatchlist =
+    watchlistCtl?.handleQuickToggleWatchlist || watchlistCtl?.handleToggleWatchlist;
 
   const topOverlay = overlayStack.length > 0 ? overlayStack[overlayStack.length - 1] : null;
 
@@ -126,15 +144,14 @@ export function TvAppShell({
   );
 
   const handlePopOverlay = useCallback(() => {
-    setOverlayStack((prev) => {
-      if (prev.length === 0) return prev;
-      const popped = prev[prev.length - 1];
-      if (popped?.type === 'detail' && popped.pushId) {
-        detailCtl.releaseDetail?.(popped.pushId);
-      }
-      return prev.slice(0, -1);
-    });
-  }, [detailCtl]);
+    const current = overlayStackRef.current;
+    if (!current || current.length === 0) return;
+    const popped = current[current.length - 1];
+    setOverlayStack((prev) => (prev.length > 0 ? prev.slice(0, -1) : prev));
+    if (popped?.type === 'detail' && popped.pushId) {
+      releaseDetailRef.current?.(popped.pushId);
+    }
+  }, []);
 
   const handleSelectSidebarTab = useCallback((tabKey) => {
     setOverlayStack([]);
@@ -144,18 +161,18 @@ export function TvAppShell({
   // Hardware Back button handler on Android TV remote
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (overlayStack.length > 0) {
+      if (overlayStackRef.current.length > 0) {
         handlePopOverlay();
         return true;
       }
-      if (activeTab !== 'home') {
+      if (activeTabRef.current !== 'home') {
         setActiveTab('home');
         return true;
       }
       return false;
     });
     return () => sub.remove();
-  }, [overlayStack.length, activeTab, handlePopOverlay]);
+  }, [handlePopOverlay]);
 
   const renderStage = () => {
     if (topOverlay?.type === 'detail') {
@@ -170,7 +187,7 @@ export function TvAppShell({
           onBack={handlePopOverlay}
           onSelectItem={handleOpenItem}
           onSelectPerson={handleOpenPerson}
-          onToggleWatchlist={watchlistCtl.handleToggleWatchlist}
+          onToggleWatchlist={handleToggleWatchlist}
           onRetry={() => detailCtl.retryDetail?.(topOverlay.pushId)}
         />
       );
@@ -186,7 +203,7 @@ export function TvAppShell({
           savedKeys={savedKeysSet}
           onBack={handlePopOverlay}
           onSelectItem={handleOpenItem}
-          onToggleWatchlist={watchlistCtl.handleToggleWatchlist}
+          onToggleWatchlist={handleToggleWatchlist}
         />
       );
     }
@@ -206,7 +223,7 @@ export function TvAppShell({
             onSubmitSearch={searchCtl.handleSearch}
             onSelectItem={handleOpenItem}
             onSelectPerson={handleOpenPerson}
-            onToggleWatchlist={watchlistCtl.handleToggleWatchlist}
+            onToggleWatchlist={handleToggleWatchlist}
             onClearRecent={detailCtl.clearRecentViewed}
           />
         );
@@ -217,7 +234,7 @@ export function TvAppShell({
             discoverVm={discoverVm}
             savedKeys={savedKeysSet}
             onSelectItem={handleOpenItem}
-            onToggleWatchlist={watchlistCtl.handleToggleWatchlist}
+            onToggleWatchlist={handleToggleWatchlist}
           />
         );
 
@@ -226,7 +243,7 @@ export function TvAppShell({
           <TvCollectionsScreen
             savedKeys={savedKeysSet}
             onSelectItem={handleOpenItem}
-            onToggleWatchlist={watchlistCtl.handleToggleWatchlist}
+            onToggleWatchlist={handleToggleWatchlist}
           />
         );
 
@@ -235,7 +252,7 @@ export function TvAppShell({
           <TvAwardsScreen
             savedKeys={savedKeysSet}
             onSelectItem={handleOpenItem}
-            onToggleWatchlist={watchlistCtl.handleToggleWatchlist}
+            onToggleWatchlist={handleToggleWatchlist}
           />
         );
 
@@ -246,7 +263,7 @@ export function TvAppShell({
             collections={watchlistCtl.watchlistCollections}
             savedKeys={savedKeysSet}
             onSelectItem={handleOpenItem}
-            onToggleWatchlist={watchlistCtl.handleToggleWatchlist}
+            onToggleWatchlist={handleToggleWatchlist}
           />
         );
 
@@ -280,7 +297,7 @@ export function TvAppShell({
             }}
             onSelectItem={handleOpenItem}
             onPlayNow={handlePlayNowFromHero}
-            onToggleWatchlist={watchlistCtl.handleToggleWatchlist}
+            onToggleWatchlist={handleToggleWatchlist}
             onNavigateTab={handleSelectSidebarTab}
           />
         );
@@ -289,12 +306,14 @@ export function TvAppShell({
 
   return (
     <View style={styles.root}>
-      <TvSidebar
-        activeTab={activeTab}
-        onSelectTab={handleSelectSidebarTab}
-        watchlistCount={watchlistCtl.watchlist?.length || 0}
-        activeDownloadCount={activeDownloadCount}
-      />
+      {!topOverlay ? (
+        <TvTopNav
+          activeTab={activeTab}
+          onSelectTab={handleSelectSidebarTab}
+          watchlistCount={watchlistCtl.watchlist?.length || 0}
+          activeDownloadCount={activeDownloadCount}
+        />
+      ) : null}
 
       <View style={styles.stageWrap}>
         {offlineBanner ? (
@@ -303,6 +322,14 @@ export function TvAppShell({
           </View>
         ) : null}
         {renderStage()}
+
+        {currentToast?.visible && currentToast?.message ? (
+          <View pointerEvents="none" style={styles.toastBanner}>
+            <Text numberOfLines={2} style={styles.toastText}>
+              {currentToast.message}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -312,22 +339,35 @@ const styles = StyleSheet.create({
   root: {
     backgroundColor: '#040301',
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: 'column',
   },
   stageWrap: {
     backgroundColor: '#040301',
     flex: 1,
   },
   offlineStrip: {
-    backgroundColor: 'rgba(212, 168, 83, 0.18)',
-    borderBottomColor: GOLD_ACCENT,
-    borderBottomWidth: 1,
-    paddingHorizontal: 28,
+    paddingHorizontal: TV_SPACE.overscanX,
     paddingVertical: 7,
   },
   offlineText: {
     color: GOLD_ACCENT,
     fontFamily: fonts.label,
+    fontSize: TV_TYPE.meta,
+    fontWeight: '700',
+  },
+  toastBanner: {
+    backgroundColor: 'rgba(12, 10, 7, 0.94)',
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    position: 'absolute',
+    right: TV_SPACE.overscanX,
+    top: 16,
+    zIndex: 99,
+  },
+  toastText: {
+    color: GOLD_ACCENT,
+    fontFamily: fonts.heading,
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },

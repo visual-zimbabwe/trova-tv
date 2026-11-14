@@ -1,9 +1,7 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { TvFocusable } from './TvFocusable';
 import { MediaArtwork } from '../components/MediaArtwork';
-import { GOLD_ACCENT } from '../theme/programme';
 import { fonts } from '../theme/tokens';
 import { resolveRatingValue } from '../lib/ratings';
 import { TV_CARD, TV_FOCUS, TV_TYPE } from './tvTheme';
@@ -20,8 +18,8 @@ function formatCardRating(item) {
 
 /**
  * 10-Foot TV Poster / Backdrop / Ranked Card.
- * Spacious artwork card that lifts with a warm-white focus ring and halo glow,
- * high-contrast 10-foot typography (>= 13-15dp), and non-overlapping rank numerals.
+ * Unobstructed poster artwork with zero overlaid text; subtle scale + soft glow on focus,
+ * revealing concise metadata below the card only when focused.
  */
 export const TvPosterCard = memo(function TvPosterCard({
   item,
@@ -33,6 +31,8 @@ export const TvPosterCard = memo(function TvPosterCard({
   onFocus,
   hasTVPreferredFocus = false,
 }) {
+  const [isFocused, setIsFocused] = useState(false);
+
   if (!item) return null;
 
   const isBackdrop = variant === 'backdrop';
@@ -60,7 +60,6 @@ export const TvPosterCard = memo(function TvPosterCard({
 
   const ratingLabel = formatCardRating(item);
   const yearLabel = item.year || item.releaseYear || '';
-  const honorSub = item.ceremonyShortName || item.awardCategory || item.sublabel || null;
 
   const metaParts = [
     yearLabel && yearLabel !== 'N/A' ? yearLabel : null,
@@ -81,62 +80,40 @@ export const TvPosterCard = memo(function TvPosterCard({
 
       <View style={{ width: cardWidth }}>
         <TvFocusable
+          appearance="card"
           onPress={() => onPress?.(item)}
           onLongPress={onLongPress ? () => onLongPress(item) : undefined}
-          onFocus={onFocus}
+          onFocus={(e) => {
+            setIsFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={() => setIsFocused(false)}
           hasTVPreferredFocus={hasTVPreferredFocus}
           scaleOnFocus={TV_FOCUS.scale}
           focusBackgroundColor="#0C0A07"
-          borderRadius={12}
+          borderRadius={10}
           style={[styles.cardFrame, { width: cardWidth, height: cardHeight }]}
           accessibilityLabel={`${item.title || item.name}${yearLabel ? `, ${yearLabel}` : ''}${
             ratingLabel ? `, rated ${ratingLabel}` : ''
           }`}
         >
-          {({ focused }) => (
-            <View style={[styles.artworkContainer, { width: innerW, height: innerH }]}>
-              <MediaArtwork
-                uri={imageUri}
-                title={item.title || item.name}
-                variant={isBackdrop ? 'backdrop' : 'poster'}
-                style={StyleSheet.absoluteFill}
-              />
-
-              <LinearGradient
-                colors={
-                  focused
-                    ? ['transparent', 'rgba(4,3,1,0.34)', 'rgba(4,3,1,0.96)']
-                    : ['transparent', 'rgba(4,3,1,0.22)', 'rgba(4,3,1,0.92)']
-                }
-                locations={[0, 0.48, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-
-              {/* Bottom Overlay Caption */}
-              <View style={styles.bottomCaption}>
-                {honorSub ? (
-                  <Text numberOfLines={1} style={styles.honorEyebrow}>
-                    {honorSub}
-                  </Text>
-                ) : null}
-                <Text
-                  numberOfLines={1}
-                  style={[styles.titleText, focused && styles.titleTextFocused]}
-                >
-                  {item.title || item.name}
-                </Text>
-                {metaParts.length > 0 ? (
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.metaText, focused && styles.metaTextFocused]}
-                  >
-                    {metaParts.join(' · ')}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          )}
+          <View style={[styles.artworkContainer, { width: innerW, height: innerH }]}>
+            <MediaArtwork
+              uri={imageUri}
+              title={item.title || item.name}
+              variant={isBackdrop ? 'backdrop' : 'poster'}
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
         </TvFocusable>
+
+        <View style={styles.focusMetaSlot}>
+          {isFocused && metaParts.length > 0 ? (
+            <Text numberOfLines={1} style={styles.metaTextFocused}>
+              {metaParts.join(' · ')}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -145,13 +122,13 @@ export const TvPosterCard = memo(function TvPosterCard({
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'flex-start',
   },
   rankedWrap: {
     paddingLeft: 44,
   },
   rankBadgeWrap: {
-    bottom: 8,
+    bottom: 28,
     left: 0,
     position: 'absolute',
     width: 42,
@@ -159,11 +136,11 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   rankNumeral: {
-    color: 'rgba(212, 168, 83, 0.82)',
+    color: 'rgba(212, 168, 83, 0.68)',
     fontFamily: fonts.display,
-    fontSize: 56,
+    fontSize: 54,
     fontWeight: '800',
-    lineHeight: 60,
+    lineHeight: 58,
     textShadowColor: '#040301',
     textShadowOffset: { width: 2, height: 2 },
     textShadowRadius: 8,
@@ -173,40 +150,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   artworkContainer: {
-    borderRadius: 9,
-    justifyContent: 'flex-end',
+    borderRadius: 8,
     overflow: 'hidden',
   },
-  bottomCaption: {
-    paddingHorizontal: 11,
-    paddingBottom: 10,
-    paddingTop: 22,
-  },
-  honorEyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginBottom: 2,
-    textTransform: 'uppercase',
-  },
-  titleText: {
-    color: '#F5EEE1',
-    fontFamily: fonts.heading,
-    fontSize: TV_TYPE.cardTitle,
-    fontWeight: '700',
-  },
-  titleTextFocused: {
-    color: '#FFFFFF',
-  },
-  metaText: {
-    color: '#C7C1B7',
-    fontFamily: fonts.body,
-    fontSize: TV_TYPE.meta,
-    marginTop: 2,
+  focusMetaSlot: {
+    height: 22,
+    justifyContent: 'center',
+    marginTop: 6,
+    paddingHorizontal: 2,
   },
   metaTextFocused: {
-    color: '#F5EEE1',
+    color: '#D8D2C7',
+    fontFamily: fonts.label,
+    fontSize: TV_TYPE.meta,
+    fontWeight: '600',
   },
 });

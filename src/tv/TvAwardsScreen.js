@@ -63,57 +63,46 @@ export function TvAwardsScreen({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerBlock}>
-        <View>
-          <Text style={styles.eyebrow}>87 GLOBAL FILM & TELEVISION HONORS</Text>
-          <Text style={styles.title}>Academy, Festival & Critics Laureates</Text>
-        </View>
+        <Text style={styles.title}>Honors</Text>
 
         <View style={styles.tabsRow}>
-          <TvFocusable
-            hasTVPreferredFocus={true}
-            onFocus={handleTopFocus}
-            onPress={() => {
-              setCategory('all');
-              setSelectedCeremonyId(null);
-            }}
-            scaleOnFocus={TV_FOCUS.scaleSmall}
-            borderRadius={999}
-            style={[styles.tabPill, category === 'all' && styles.tabPillActive]}
-          >
-            <Text style={[styles.tabText, category === 'all' && styles.tabTextActive]}>
-              All Laureates (87)
-            </Text>
-          </TvFocusable>
-
-          <TvFocusable
-            onFocus={handleTopFocus}
-            onPress={() => {
-              setCategory('film');
-              setSelectedCeremonyId(null);
-            }}
-            scaleOnFocus={TV_FOCUS.scaleSmall}
-            borderRadius={999}
-            style={[styles.tabPill, category === 'film' && styles.tabPillActive]}
-          >
-            <Text style={[styles.tabText, category === 'film' && styles.tabTextActive]}>
-              Film Ceremonies ({filmRows.length})
-            </Text>
-          </TvFocusable>
-
-          <TvFocusable
-            onFocus={handleTopFocus}
-            onPress={() => {
-              setCategory('tv');
-              setSelectedCeremonyId(null);
-            }}
-            scaleOnFocus={TV_FOCUS.scaleSmall}
-            borderRadius={999}
-            style={[styles.tabPill, category === 'tv' && styles.tabPillActive]}
-          >
-            <Text style={[styles.tabText, category === 'tv' && styles.tabTextActive]}>
-              TV Honors ({tvRows.length})
-            </Text>
-          </TvFocusable>
+          {[
+            { key: 'all', label: 'All Laureates (87)', pref: true },
+            { key: 'film', label: `Film (${filmRows.length})` },
+            { key: 'tv', label: `TV (${tvRows.length})` },
+          ].map((tabItem) => {
+            const active = category === tabItem.key;
+            return (
+              <TvFocusable
+                key={tabItem.key}
+                appearance="text"
+                hasTVPreferredFocus={Boolean(tabItem.pref)}
+                onFocus={handleTopFocus}
+                onPress={() => {
+                  setCategory(tabItem.key);
+                  setSelectedCeremonyId(null);
+                }}
+                scaleOnFocus={TV_FOCUS.scaleSmall}
+                borderRadius={6}
+                style={styles.tabPill}
+              >
+                {({ focused }) => (
+                  <View style={styles.tabInner}>
+                    <Text
+                      style={[
+                        styles.tabText,
+                        active && styles.tabTextActive,
+                        focused && styles.textFocused,
+                      ]}
+                    >
+                      {tabItem.label}
+                    </Text>
+                    {active ? <View style={styles.activeUnderline} /> : null}
+                  </View>
+                )}
+              </TvFocusable>
+            );
+          })}
         </View>
       </View>
 
@@ -124,15 +113,27 @@ export function TvAwardsScreen({
         contentContainerStyle={styles.ceremonyStrip}
       >
         <TvFocusable
+          appearance="text"
           onFocus={handleTopFocus}
           onPress={() => setSelectedCeremonyId(null)}
           scaleOnFocus={TV_FOCUS.scaleSmall}
-          borderRadius={999}
-          style={[styles.ceremonyChip, !selectedCeremonyId && styles.tabPillActive]}
+          borderRadius={6}
+          style={styles.ceremonyChip}
         >
-          <Text style={[styles.ceremonyChipText, !selectedCeremonyId && styles.tabTextActive]}>
-            All Ceremonies
-          </Text>
+          {({ focused }) => (
+            <View style={styles.tabInner}>
+              <Text
+                style={[
+                  styles.ceremonyChipText,
+                  !selectedCeremonyId && styles.tabTextActive,
+                  focused && styles.textFocused,
+                ]}
+              >
+                All Ceremonies
+              </Text>
+              {!selectedCeremonyId ? <View style={styles.activeUnderline} /> : null}
+            </View>
+          )}
         </TvFocusable>
 
         {ceremonyFilterList.map((row, idx) => {
@@ -142,15 +143,27 @@ export function TvAwardsScreen({
           return (
             <TvFocusable
               key={rowId}
+              appearance="text"
               onFocus={handleTopFocus}
               onPress={() => setSelectedCeremonyId((prev) => (prev === rowId ? null : rowId))}
               scaleOnFocus={TV_FOCUS.scaleSmall}
-              borderRadius={999}
-              style={[styles.ceremonyChip, active && styles.tabPillActive]}
+              borderRadius={6}
+              style={styles.ceremonyChip}
             >
-              <Text style={[styles.ceremonyChipText, active && styles.tabTextActive]}>
-                {rowLabel}
-              </Text>
+              {({ focused }) => (
+                <View style={styles.tabInner}>
+                  <Text
+                    style={[
+                      styles.ceremonyChipText,
+                      active && styles.tabTextActive,
+                      focused && styles.textFocused,
+                    ]}
+                  >
+                    {rowLabel}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
             </TvFocusable>
           );
         })}
@@ -160,13 +173,10 @@ export function TvAwardsScreen({
       {activeRows.map((row, idx) => {
         const rowId = row.category?.id || row.id || `rail-${idx}`;
         const rowTitle = row.category?.label || row.category?.fullName || row.title || 'Honors';
-        const rowEyebrow = row.category?.awardName || row.eyebrow || 'PRESTIGE HONORS';
         return (
           <TvContentRail
             key={rowId}
-            eyebrow={rowEyebrow}
             title={rowTitle}
-            subtitle={`${row.items?.length || 0} laureates`}
             data={row.items || []}
             savedKeys={savedKeys}
             onSelectItem={onSelectItem}
@@ -186,7 +196,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 64,
-    paddingTop: 20,
+    paddingTop: 14,
   },
   headerBlock: {
     alignItems: 'center',
@@ -194,15 +204,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 14,
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 10,
     paddingHorizontal: TV_SPACE.overscanX,
-  },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
   },
   title: {
     color: '#F5EEE1',
@@ -212,54 +215,59 @@ const styles = StyleSheet.create({
   },
   tabsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
   },
   tabPill: {
     alignItems: 'center',
-    backgroundColor: '#191610',
-    borderColor: 'rgba(212, 168, 83, 0.35)',
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  tabPillActive: {
-    backgroundColor: GOLD_ACCENT,
-    borderColor: GOLD_ACCENT,
+  tabInner: {
+    alignItems: 'center',
   },
   tabText: {
-    color: '#E6E1D7',
+    color: '#ABA59B',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   tabTextActive: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
+    fontFamily: fonts.heading,
+    fontWeight: '700',
+  },
+  textFocused: {
+    color: '#FFFFFF',
     fontFamily: fonts.heading,
     fontWeight: '800',
   },
+  activeUnderline: {
+    backgroundColor: GOLD_ACCENT,
+    borderRadius: 1,
+    height: 2,
+    marginTop: 4,
+    width: '100%',
+  },
   ceremonyStrip: {
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 22,
+    gap: 14,
+    marginBottom: 20,
     paddingHorizontal: TV_SPACE.overscanX,
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   ceremonyChip: {
     alignItems: 'center',
-    backgroundColor: '#14110C',
-    borderColor: '#312D27',
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   ceremonyChipText: {
-    color: '#E6CD9C',
+    color: '#ABA59B',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 });

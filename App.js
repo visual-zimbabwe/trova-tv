@@ -2,6 +2,7 @@ import 'react-native-gesture-handler';
 import { enableScreens } from 'react-native-screens';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect } from 'react';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -55,11 +56,20 @@ export default function App() {
 }
 
 function TrovaTvApp() {
-  useFonts(FONT_MAP);
+  const [fontsLoaded, fontError] = useFonts(FONT_MAP);
 
   useEffect(() => {
     ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(() => {});
   }, []);
+
+  if (!fontsLoaded && !fontError) {
+    return <View style={{ flex: 1, backgroundColor: '#040301' }} />;
+  }
+
+  return <TrovaTvAppLoaded />;
+}
+
+function TrovaTvAppLoaded() {
 
   const { showToast } = useToast();
   const requestError = useRequestError({ showToast });

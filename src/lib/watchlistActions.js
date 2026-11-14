@@ -148,6 +148,41 @@ export function upsertItem(watchlist, item) {
 }
 
 /**
+ * Instant 10-foot TV watchlist toggle: if the item is currently in the user's
+ * library, remove it; otherwise save it directly to the library (`status: 'saved'`).
+ * Pure: returns `{ action: 'added' | 'removed' | 'noop', item, watchlist }`.
+ * @param {WatchlistItem[]} watchlist
+ * @param {any} result
+ * @returns {{ action: 'added' | 'removed' | 'noop', item: WatchlistItem | null, watchlist: WatchlistItem[] }}
+ */
+export function quickToggleWatchlistItem(watchlist, result) {
+  if (!result) return { action: 'noop', item: null, watchlist: Array.isArray(watchlist) ? watchlist : [] };
+  const mediaType =
+    result.mediaType || (result.Type === 'series' ? 'tv' : 'movie');
+  const title = String(result.title || result.Title || result.name || '').trim();
+  const tmdbId = result.tmdbId ?? result.id;
+  const candidate = { ...result, tmdbId, mediaType, title };
+  const key = watchlistEntryKey(candidate);
+  const list = Array.isArray(watchlist) ? watchlist : [];
+  if (!key || !title) return { action: 'noop', item: null, watchlist: list };
+
+  const existing = list.find((item) => watchlistEntryKey(item) === key);
+  if (existing && isInUserLibrary(existing)) {
+    const next = list.filter((item) => watchlistEntryKey(item) !== key);
+    return { action: 'removed', item: existing, watchlist: next };
+  }
+
+  const { item: savedItem, watchlist: next } = upsertItem(list, {
+    ...(existing || {}),
+    ...candidate,
+    status: 'saved',
+    collectionIds: existing?.collectionIds || [],
+  });
+  if (!savedItem) return { action: 'noop', item: null, watchlist: list };
+  return { action: 'added', item: savedItem, watchlist: next };
+}
+
+/**
  * Move a collection id to the front of the most-recently-used list, de-duping
  * and capping the length. Pure. Feeds the "Recent" quick-pick row in the save
  * sheet so "pick every time" doesn't mean "hunt every time".

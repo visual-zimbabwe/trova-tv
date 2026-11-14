@@ -449,21 +449,20 @@ export function TvDetailScreen({
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Back Button & Eyebrow */}
+        {/* Back Action */}
         <View style={styles.topBar}>
           <TvFocusable
+            appearance="text"
             onPress={onBack}
             scaleOnFocus={1.04}
-            borderRadius={999}
+            borderRadius={6}
             style={styles.backBtn}
             accessibilityLabel="Back"
           >
-            <Text style={styles.backBtnText}>Back</Text>
+            {({ focused }) => (
+              <Text style={[styles.backBtnText, focused && styles.textBtnFocused]}>Back</Text>
+            )}
           </TvFocusable>
-
-          <Text style={styles.eyebrowText}>
-            {mediaType === 'tv' ? 'TELEVISION SERIES' : 'FEATURE FILM'}
-          </Text>
         </View>
 
         {/* Main Detail Header Content */}
@@ -484,47 +483,20 @@ export function TvDetailScreen({
               {title}
             </Text>
 
-            {/* Scorecard Row: Clean borderless pills */}
-            <View style={styles.scorecardRow}>
-              {imdbScore ? (
-                <View style={styles.scoreBadgeGold}>
-                  <Text style={styles.scoreSourceGold}>IMDb</Text>
-                  <Text style={styles.scoreValueGold}>{imdbScore}</Text>
-                </View>
-              ) : null}
-
-              {rtScore ? (
-                <View style={styles.scoreBadge}>
-                  <Text style={styles.scoreSource}>Rotten Tomatoes</Text>
-                  <Text style={styles.scoreValue}>{rtScore}</Text>
-                </View>
-              ) : null}
-
-              {metaScore ? (
-                <View style={styles.scoreBadge}>
-                  <Text style={styles.scoreSource}>Metacritic</Text>
-                  <Text style={styles.scoreValue}>{metaScore}</Text>
-                </View>
-              ) : null}
-
-              {tmdbScore && !imdbScore ? (
-                <View style={styles.scoreBadgeGold}>
-                  <Text style={styles.scoreSourceGold}>TMDb</Text>
-                  <Text style={styles.scoreValueGold}>{tmdbScore}</Text>
-                </View>
-              ) : null}
-
-              {year ? <Text style={styles.metaDot}>{year}</Text> : null}
-              {runtimeLabel ? <Text style={styles.metaDot}>· {runtimeLabel}</Text> : null}
-              {result.Rated && result.Rated !== 'N/A' ? (
-                <Text style={styles.metaDot}>· {result.Rated}</Text>
-              ) : null}
-              {nextEpLabel ? (
-                <View style={styles.nextEpPill}>
-                  <Text style={styles.nextEpText}>{nextEpLabel}</Text>
-                </View>
-              ) : null}
-            </View>
+            {/* Inline Metadata & Scores Line — no colored chips */}
+            <Text numberOfLines={2} style={styles.metaDot}>
+              {[
+                imdbScore ? `IMDb ${imdbScore}` : tmdbScore ? `TMDb ${tmdbScore}` : null,
+                rtScore ? `RT ${rtScore}` : null,
+                metaScore ? `Metacritic ${metaScore}` : null,
+                year || null,
+                runtimeLabel || null,
+                result.Rated && result.Rated !== 'N/A' ? result.Rated : null,
+                nextEpLabel || null,
+              ]
+                .filter(Boolean)
+                .join('  ·  ')}
+            </Text>
 
             {genresLabel ? <Text style={styles.genresLine}>{genresLabel}</Text> : null}
 
@@ -535,19 +507,18 @@ export function TvDetailScreen({
               </Text>
             ) : null}
 
-            {/* Awards Summary Banner */}
+            {/* Awards Summary Text */}
             {result.Awards && result.Awards !== 'N/A' ? (
-              <View style={styles.awardsBanner}>
-                <Text numberOfLines={1} style={styles.awardsBannerText}>
-                  {result.Awards}
-                </Text>
-              </View>
+              <Text numberOfLines={1} style={styles.awardsBannerText}>
+                {result.Awards}
+              </Text>
             ) : null}
 
-            {/* 10-Foot Action Buttons Row */}
+            {/* 10-Foot Borderless Text Action Row */}
             <View style={styles.actionRow}>
               {mediaType === 'movie' ? (
                 <TvFocusable
+                  appearance="text"
                   hasTVPreferredFocus={true}
                   onPress={() => {
                     if (existingDownload?.state === 'completed') {
@@ -559,23 +530,25 @@ export function TvDetailScreen({
                     }
                   }}
                   scaleOnFocus={1.04}
-                  borderRadius={999}
-                  focusBorderColor="#FEFBF6"
+                  borderRadius={8}
                   style={styles.primaryBtn}
                   accessibilityLabel="Play movie now"
                 >
-                  <Text style={styles.primaryBtnText}>
-                    {existingDownload?.state === 'completed'
-                      ? 'Play Offline'
-                      : topStream
-                        ? `Play (${topStream.attributes?.resolution || '1080p'} · ${topStream.seeders} peers)`
-                        : streamsLoading
-                          ? 'Searching Swarms...'
-                          : 'Browse Streams'}
-                  </Text>
+                  {({ focused }) => (
+                    <Text style={[styles.primaryBtnText, focused && styles.textBtnFocused]}>
+                      {existingDownload?.state === 'completed'
+                        ? 'Play Offline'
+                        : topStream
+                          ? `Play ${topStream.attributes?.resolution || '1080p'}`
+                          : streamsLoading
+                            ? 'Searching...'
+                            : 'Browse Streams'}
+                    </Text>
+                  )}
                 </TvFocusable>
               ) : (
                 <TvFocusable
+                  appearance="text"
                   hasTVPreferredFocus={true}
                   onPress={() => {
                     if (episodes.length > 0) {
@@ -583,32 +556,37 @@ export function TvDetailScreen({
                     }
                   }}
                   scaleOnFocus={1.04}
-                  borderRadius={999}
-                  focusBorderColor="#FEFBF6"
+                  borderRadius={8}
                   style={styles.primaryBtn}
                   accessibilityLabel={`Play Season ${selectedSeasonNum} Episode 1`}
                 >
-                  <Text style={styles.primaryBtnText}>
-                    Play S{String(selectedSeasonNum).padStart(2, '0')}E01
-                  </Text>
+                  {({ focused }) => (
+                    <Text style={[styles.primaryBtnText, focused && styles.textBtnFocused]}>
+                      Play S{String(selectedSeasonNum).padStart(2, '0')}E01
+                    </Text>
+                  )}
                 </TvFocusable>
               )}
 
               {mediaType === 'movie' && streams.length > 0 ? (
                 <TvFocusable
+                  appearance="text"
                   onPress={() => setShowAllStreams((prev) => !prev)}
                   scaleOnFocus={1.04}
-                  borderRadius={999}
+                  borderRadius={8}
                   style={styles.secondaryBtn}
                 >
-                  <Text style={styles.secondaryBtnText}>
-                    {showAllStreams ? 'Hide Releases' : `All Releases (${streams.length})`}
-                  </Text>
+                  {({ focused }) => (
+                    <Text style={[styles.secondaryBtnText, focused && styles.textBtnFocused]}>
+                      {showAllStreams ? 'Hide Releases' : `Releases (${streams.length})`}
+                    </Text>
+                  )}
                 </TvFocusable>
               ) : null}
 
               {mediaType === 'movie' && topStream && !existingDownload ? (
                 <TvFocusable
+                  appearance="text"
                   onPress={() =>
                     startDownload({
                       magnet: topStream.magnetUrl,
@@ -625,25 +603,35 @@ export function TvDetailScreen({
                     })
                   }
                   scaleOnFocus={1.04}
-                  borderRadius={999}
+                  borderRadius={8}
                   style={styles.secondaryBtn}
                 >
-                  <Text style={styles.secondaryBtnText}>Download</Text>
+                  {({ focused }) => (
+                    <Text style={[styles.secondaryBtnText, focused && styles.textBtnFocused]}>
+                      Download
+                    </Text>
+                  )}
                 </TvFocusable>
               ) : null}
 
               {bestTrailer ? (
                 <TvFocusable
+                  appearance="text"
                   onPress={() => setTrailerOpen(true)}
                   scaleOnFocus={1.04}
-                  borderRadius={999}
+                  borderRadius={8}
                   style={styles.secondaryBtn}
                 >
-                  <Text style={styles.secondaryBtnText}>Trailer</Text>
+                  {({ focused }) => (
+                    <Text style={[styles.secondaryBtnText, focused && styles.textBtnFocused]}>
+                      Trailer
+                    </Text>
+                  )}
                 </TvFocusable>
               ) : null}
 
               <TvFocusable
+                appearance="text"
                 onPress={() =>
                   onToggleWatchlist?.({
                     tmdbId,
@@ -657,12 +645,20 @@ export function TvDetailScreen({
                   })
                 }
                 scaleOnFocus={1.04}
-                borderRadius={999}
+                borderRadius={8}
                 style={styles.secondaryBtn}
               >
-                <Text style={[styles.secondaryBtnText, isSaved && { color: GOLD_ACCENT }]}>
-                  {isSaved ? 'In Watchlist' : 'Add to Watchlist'}
-                </Text>
+                {({ focused }) => (
+                  <Text
+                    style={[
+                      styles.secondaryBtnText,
+                      isSaved && { color: GOLD_ACCENT },
+                      focused && styles.textBtnFocused,
+                    ]}
+                  >
+                    {isSaved ? 'In Watchlist' : 'Add to Watchlist'}
+                  </Text>
+                )}
               </TvFocusable>
             </View>
           </View>
@@ -685,54 +681,82 @@ export function TvDetailScreen({
               </Text>
             ) : null}
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
             <TvFocusable
+              appearance="text"
               onPress={() => playDownloaded(existingDownload)}
-              borderRadius={999}
+              borderRadius={6}
               style={styles.smallGoldBtn}
             >
-              <Text style={styles.smallGoldBtnText}>Play File</Text>
+              {({ focused }) => (
+                <Text style={[styles.smallGoldBtnText, focused && styles.textBtnFocused]}>
+                  Play File
+                </Text>
+              )}
             </TvFocusable>
             {existingDownload.state === 'downloading' ? (
               <TvFocusable
+                appearance="text"
                 onPress={() => pauseDownload(existingDownload.id)}
-                borderRadius={999}
+                borderRadius={6}
                 style={styles.smallOutlineBtn}
               >
-                <Text style={styles.smallOutlineBtnText}>Pause</Text>
+                {({ focused }) => (
+                  <Text style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}>
+                    Pause
+                  </Text>
+                )}
               </TvFocusable>
             ) : existingDownload.state === 'paused' ? (
               <TvFocusable
+                appearance="text"
                 onPress={() => resumeDownload(existingDownload.id)}
-                borderRadius={999}
+                borderRadius={6}
                 style={styles.smallOutlineBtn}
               >
-                <Text style={styles.smallOutlineBtnText}>Resume</Text>
+                {({ focused }) => (
+                  <Text style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}>
+                    Resume
+                  </Text>
+                )}
               </TvFocusable>
             ) : null}
             <TvFocusable
+              appearance="text"
               onPress={() => deleteDownload(existingDownload.id)}
-              borderRadius={999}
+              borderRadius={6}
               style={styles.smallOutlineBtn}
             >
-              <Text style={[styles.smallOutlineBtnText, { color: '#FF6961' }]}>Delete</Text>
+              {({ focused }) => (
+                <Text
+                  style={[
+                    styles.smallOutlineBtnText,
+                    { color: '#FF6961' },
+                    focused && styles.textBtnFocused,
+                  ]}
+                >
+                  Delete
+                </Text>
+              )}
             </TvFocusable>
           </View>
         </View>
       ) : null}
 
-      {/* Where to Watch Streaming Availability Strip with full country names */}
+      {/* Where to Watch Streaming Availability */}
       {watchRows.length > 0 ? (
         <View style={styles.sectionBlock}>
-          <Text style={styles.sectionEyebrow}>WHERE TO WATCH OFFICIALLY</Text>
+          <Text style={styles.sectionTitle}>Where to Watch</Text>
           <View style={styles.providerPillsRow}>
             {watchRows.slice(0, 16).map((row) => {
               const services = serviceLabelsForRow(row);
               const servicesLabel = services.length > 0 ? services.join(', ') : 'Streaming';
               return (
                 <View key={row.code} style={styles.providerPill}>
-                  <Text style={styles.providerCountryText}>{row.country}</Text>
-                  <Text style={styles.providerServicesText}>{servicesLabel}</Text>
+                  <Text style={styles.providerCountryText}>
+                    {row.country}{' '}
+                    <Text style={styles.providerServicesText}>· {servicesLabel}</Text>
+                  </Text>
                 </View>
               );
             })}
@@ -743,8 +767,7 @@ export function TvDetailScreen({
       {/* Movie All Peer Releases Drawer */}
       {mediaType === 'movie' && showAllStreams && streams.length > 0 ? (
         <View style={styles.sectionBlock}>
-          <Text style={styles.sectionEyebrow}>AVAILABLE PEER SWARM RELEASES</Text>
-          <Text style={styles.sectionTitle}>Select Quality & Edition</Text>
+          <Text style={styles.sectionTitle}>Releases</Text>
           <View style={styles.releasesList}>
             {streams.slice(0, 14).map((rel, idx) => (
               <View key={`${rel.infoHash || idx}`} style={styles.releaseRow}>
@@ -765,15 +788,21 @@ export function TvDetailScreen({
                       .join(' · ')}
                   </Text>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
                   <TvFocusable
+                    appearance="text"
                     onPress={() => handleLaunchMovieStream(rel, `rel-${idx}`)}
-                    borderRadius={999}
+                    borderRadius={6}
                     style={styles.smallGoldBtn}
                   >
-                    <Text style={styles.smallGoldBtnText}>Play</Text>
+                    {({ focused }) => (
+                      <Text style={[styles.smallGoldBtnText, focused && styles.textBtnFocused]}>
+                        Play
+                      </Text>
+                    )}
                   </TvFocusable>
                   <TvFocusable
+                    appearance="text"
                     onPress={() =>
                       startDownload({
                         magnet: rel.magnetUrl,
@@ -789,10 +818,14 @@ export function TvDetailScreen({
                         quality: rel.attributes?.resolution || '',
                       })
                     }
-                    borderRadius={999}
+                    borderRadius={6}
                     style={styles.smallOutlineBtn}
                   >
-                    <Text style={styles.smallOutlineBtnText}>Download</Text>
+                    {({ focused }) => (
+                      <Text style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}>
+                        Download
+                      </Text>
+                    )}
                   </TvFocusable>
                 </View>
               </View>
@@ -804,11 +837,11 @@ export function TvDetailScreen({
       {/* TV Series Interactive Season & Episode Browser */}
       {mediaType === 'tv' && seasons.length > 0 ? (
         <View style={styles.sectionBlock}>
-          <Text style={styles.sectionEyebrow}>EPISODE GUIDE & STREAMING</Text>
           <View style={styles.seasonHeaderRow}>
-            <Text style={styles.sectionTitle}>Seasons & Episodes</Text>
+            <Text style={styles.sectionTitle}>Episodes</Text>
             {topSeasonPack ? (
               <TvFocusable
+                appearance="text"
                 onPress={() =>
                   launchStream({
                     magnetUrl: topSeasonPack.magnetUrl,
@@ -823,17 +856,19 @@ export function TvDetailScreen({
                     episode: 1,
                   })
                 }
-                borderRadius={999}
+                borderRadius={6}
                 style={styles.smallOutlineBtn}
               >
-                <Text style={styles.smallOutlineBtnText}>
-                  Season {selectedSeasonNum} Pack ({topSeasonPack.seeders} peers)
-                </Text>
+                {({ focused }) => (
+                  <Text style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}>
+                    Season {selectedSeasonNum} Pack
+                  </Text>
+                )}
               </TvFocusable>
             ) : null}
           </View>
 
-          {/* Horizontal Season Selector Pills */}
+          {/* Horizontal Season Selector Text Tabs */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -844,15 +879,27 @@ export function TvDetailScreen({
               return (
                 <TvFocusable
                   key={s.seasonNumber}
+                  appearance="text"
                   onPress={() => setSelectedSeasonNum(s.seasonNumber)}
                   scaleOnFocus={1.04}
-                  borderRadius={999}
-                  style={[styles.seasonPill, active && styles.seasonPillActive]}
+                  borderRadius={6}
+                  style={styles.seasonPill}
                 >
-                  <Text style={[styles.seasonPillText, active && styles.seasonPillTextActive]}>
-                    {s.name || `Season ${s.seasonNumber}`}
-                    {s.episodeCount ? ` (${s.episodeCount})` : ''}
-                  </Text>
+                  {({ focused }) => (
+                    <View style={{ alignItems: 'center' }}>
+                      <Text
+                        style={[
+                          styles.seasonPillText,
+                          active && styles.seasonPillTextActive,
+                          focused && styles.textBtnFocused,
+                        ]}
+                      >
+                        {s.name || `Season ${s.seasonNumber}`}
+                        {s.episodeCount ? ` (${s.episodeCount})` : ''}
+                      </Text>
+                      {active ? <View style={styles.activeUnderline} /> : null}
+                    </View>
+                  )}
                 </TvFocusable>
               );
             })}
@@ -880,11 +927,6 @@ export function TvDetailScreen({
                           variant="backdrop"
                           style={styles.episodeStill}
                         />
-                        <View style={styles.epNumBadge}>
-                          <Text style={styles.epNumText}>
-                            E{String(ep.episodeNumber).padStart(2, '0')}
-                          </Text>
-                        </View>
                       </View>
 
                       <View style={styles.episodeInfo}>
@@ -898,9 +940,9 @@ export function TvDetailScreen({
                               ? `${ep.runtimeMinutes || ep.runtime}m`
                               : null,
                             ep.rating
-                              ? `★ ${ep.rating}`
+                              ? `${ep.rating}`
                               : ep.voteAverage > 0
-                                ? `★ ${ep.voteAverage.toFixed(1)}`
+                                ? `${ep.voteAverage.toFixed(1)}`
                                 : null,
                           ]
                             .filter(Boolean)
@@ -915,25 +957,33 @@ export function TvDetailScreen({
 
                       <View style={styles.episodeActions}>
                         <TvFocusable
+                          appearance="text"
                           onPress={() => handlePlayEpisode(ep)}
                           scaleOnFocus={1.04}
-                          borderRadius={999}
+                          borderRadius={6}
                           style={styles.smallGoldBtn}
                         >
-                          <Text style={styles.smallGoldBtnText}>
-                            {isEpLoading ? 'Loading...' : 'Play'}
-                          </Text>
+                          {({ focused }) => (
+                            <Text style={[styles.smallGoldBtnText, focused && styles.textBtnFocused]}>
+                              {isEpLoading ? 'Loading...' : 'Play'}
+                            </Text>
+                          )}
                         </TvFocusable>
 
                         <TvFocusable
+                          appearance="text"
                           onPress={() => handleBrowseEpisodeSources(ep)}
                           scaleOnFocus={1.04}
-                          borderRadius={999}
+                          borderRadius={6}
                           style={styles.smallOutlineBtn}
                         >
-                          <Text style={styles.smallOutlineBtnText}>
-                            {isEpExpanded ? 'Hide' : 'Sources'}
-                          </Text>
+                          {({ focused }) => (
+                            <Text
+                              style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}
+                            >
+                              {isEpExpanded ? 'Hide' : 'Sources'}
+                            </Text>
+                          )}
                         </TvFocusable>
                       </View>
                     </View>
@@ -947,8 +997,9 @@ export function TvDetailScreen({
                               {rel.name} ({rel.attributes?.resolution || 'HD'} · {rel.seeders}{' '}
                               peers)
                             </Text>
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
                               <TvFocusable
+                                appearance="text"
                                 onPress={() =>
                                   launchStream({
                                     magnetUrl: rel.magnetUrl,
@@ -963,12 +1014,22 @@ export function TvDetailScreen({
                                     episode: ep.episodeNumber,
                                   })
                                 }
-                                borderRadius={999}
+                                borderRadius={6}
                                 style={styles.smallGoldBtn}
                               >
-                                <Text style={styles.smallGoldBtnText}>Stream</Text>
+                                {({ focused }) => (
+                                  <Text
+                                    style={[
+                                      styles.smallGoldBtnText,
+                                      focused && styles.textBtnFocused,
+                                    ]}
+                                  >
+                                    Stream
+                                  </Text>
+                                )}
                               </TvFocusable>
                               <TvFocusable
+                                appearance="text"
                                 onPress={() =>
                                   startDownload({
                                     magnet: rel.magnetUrl,
@@ -985,10 +1046,19 @@ export function TvDetailScreen({
                                     posterUrl: posterUri,
                                   })
                                 }
-                                borderRadius={999}
+                                borderRadius={6}
                                 style={styles.smallOutlineBtn}
                               >
-                                <Text style={styles.smallOutlineBtnText}>Download</Text>
+                                {({ focused }) => (
+                                  <Text
+                                    style={[
+                                      styles.smallOutlineBtnText,
+                                      focused && styles.textBtnFocused,
+                                    ]}
+                                  >
+                                    Download
+                                  </Text>
+                                )}
                               </TvFocusable>
                             </View>
                           </View>
@@ -1006,8 +1076,7 @@ export function TvDetailScreen({
       {/* Cast & Crew Swimlane */}
       {castList.length > 0 ? (
         <View style={styles.sectionBlock}>
-          <Text style={styles.sectionEyebrow}>CAST & CREATORS</Text>
-          <Text style={styles.sectionTitle}>Featured Performers</Text>
+          <Text style={styles.sectionTitle}>Cast</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1016,8 +1085,9 @@ export function TvDetailScreen({
             {castList.map((person, idx) => (
               <TvFocusable
                 key={`${person.id || person.name}-${idx}`}
+                appearance="text"
                 onPress={() => onSelectPerson?.(person)}
-                scaleOnFocus={1.05}
+                scaleOnFocus={1.04}
                 borderRadius={10}
                 style={styles.castCard}
               >
@@ -1044,9 +1114,7 @@ export function TvDetailScreen({
       {/* Franchise Rail */}
       {franchiseItems.length > 1 ? (
         <TvContentRail
-          eyebrow="FRANCHISE CONTINUITY"
           title={franchiseName || 'Film Collection'}
-          subtitle={`${franchiseItems.length} installments`}
           data={franchiseItems}
           savedKeys={savedKeys}
           onSelectItem={onSelectItem}
@@ -1057,7 +1125,6 @@ export function TvDetailScreen({
       {/* Recommended & Similar Swimlanes */}
       {recommendedItems.length > 0 ? (
         <TvContentRail
-          eyebrow="CURATED FOR YOU"
           title="Recommended Next"
           data={recommendedItems.slice(0, 20)}
           savedKeys={savedKeys}
@@ -1068,7 +1135,6 @@ export function TvDetailScreen({
 
       {similarItems.length > 0 ? (
         <TvContentRail
-          eyebrow="RELATED PROGRAMME"
           title="More Like This"
           data={similarItems.slice(0, 20)}
           savedKeys={savedKeys}
@@ -1131,11 +1197,10 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.10)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   backBtnText: {
     color: GOLD_ACCENT,
@@ -1143,12 +1208,9 @@ const styles = StyleSheet.create({
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
-  eyebrowText: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.5,
+  textBtnFocused: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   heroBody: {
     flexDirection: 'row',
@@ -1180,146 +1242,75 @@ const styles = StyleSheet.create({
     lineHeight: 36,
     marginBottom: 8,
   },
-  scorecardRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 8,
-  },
-  scoreBadgeGold: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(212, 168, 83, 0.18)',
-    borderRadius: 6,
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  scoreSourceGold: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '800',
-  },
-  scoreValueGold: {
-    color: '#F5EEE1',
-    fontFamily: fonts.heading,
-    fontSize: TV_TYPE.meta,
-    fontWeight: '800',
-  },
-  scoreBadge: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
-    borderRadius: 6,
-    flexDirection: 'row',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  scoreSource: {
-    color: '#C7C1B7',
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-  },
-  scoreValue: {
-    color: '#F5EEE1',
-    fontFamily: fonts.heading,
-    fontSize: TV_TYPE.meta,
-    fontWeight: '700',
-  },
   metaDot: {
-    color: '#E6CD9C',
+    color: '#D8D2C7',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
     fontWeight: '600',
-  },
-  nextEpPill: {
-    backgroundColor: 'rgba(76, 217, 100, 0.16)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  nextEpText: {
-    color: '#4CD964',
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
+    marginBottom: 8,
   },
   genresLine: {
-    color: '#DCD7CE',
+    color: '#ABA59B',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
     fontWeight: '600',
     marginBottom: 8,
   },
   plotText: {
-    color: '#DCD7CE',
+    color: '#C7C1B7',
     fontFamily: fonts.body,
     fontSize: TV_TYPE.body,
     lineHeight: 22,
-    marginBottom: 12,
+    marginBottom: 10,
     maxWidth: '94%',
   },
-  awardsBanner: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(212, 168, 83, 0.12)',
-    borderRadius: 6,
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
   awardsBannerText: {
-    color: '#F0DEC0',
+    color: GOLD_ACCENT,
     fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
+    fontSize: TV_TYPE.meta,
+    fontWeight: '600',
+    marginBottom: 12,
   },
   actionRow: {
     alignItems: 'center',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 14,
+    gap: 18,
     marginTop: 4,
   },
   primaryBtn: {
     alignItems: 'center',
-    backgroundColor: GOLD_ACCENT,
     justifyContent: 'center',
     minHeight: TV_SPACE.targetMin,
-    paddingHorizontal: 22,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   secondaryBtn: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.10)',
     justifyContent: 'center',
     minHeight: TV_SPACE.targetMin,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   primaryBtnText: {
-    color: '#140F06',
+    color: '#F5EEE1',
     fontFamily: fonts.heading,
     fontSize: TV_TYPE.button,
     fontWeight: '800',
   },
   secondaryBtnText: {
-    color: '#F5EEE1',
+    color: '#D8D2C7',
     fontFamily: fonts.heading,
     fontSize: TV_TYPE.button,
     fontWeight: '700',
   },
   downloadBanner: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.06)',
-    borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 18,
     marginHorizontal: TV_SPACE.overscanX,
-    padding: 14,
+    paddingVertical: 10,
   },
   downloadTitle: {
     color: '#F5EEE1',
@@ -1337,14 +1328,6 @@ const styles = StyleSheet.create({
     marginBottom: 26,
     paddingHorizontal: TV_SPACE.overscanX,
   },
-  sectionEyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
-    marginBottom: 6,
-  },
   sectionTitle: {
     color: '#F5EEE1',
     fontFamily: fonts.heading,
@@ -1355,14 +1338,11 @@ const styles = StyleSheet.create({
   providerPillsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 18,
     marginTop: 4,
   },
   providerPill: {
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   providerCountryText: {
     color: '#F5EEE1',
@@ -1371,23 +1351,19 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   providerServicesText: {
-    color: GOLD_ACCENT,
+    color: '#B5AFA4',
     fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
+    fontSize: TV_TYPE.meta,
     fontWeight: '600',
-    marginTop: 2,
   },
   releasesList: {
     gap: 10,
   },
   releaseRow: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.05)',
-    borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   releaseName: {
     color: '#F5EEE1',
@@ -1403,29 +1379,27 @@ const styles = StyleSheet.create({
   },
   smallGoldBtn: {
     alignItems: 'center',
-    backgroundColor: GOLD_ACCENT,
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   smallGoldBtnText: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
     fontFamily: fonts.heading,
     fontSize: TV_TYPE.meta,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   smallOutlineBtn: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.10)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   smallOutlineBtnText: {
-    color: '#F5EEE1',
-    fontFamily: fonts.label,
+    color: '#D8D2C7',
+    fontFamily: fonts.heading,
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
@@ -1433,49 +1407,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   seasonTabsRow: {
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
     paddingBottom: 14,
     paddingVertical: 4,
   },
   seasonPill: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-  },
-  seasonPillActive: {
-    backgroundColor: GOLD_ACCENT,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   seasonPillText: {
-    color: '#E6E1D7',
-    fontFamily: fonts.label,
+    color: '#ABA59B',
+    fontFamily: fonts.heading,
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
   seasonPillTextActive: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
     fontFamily: fonts.heading,
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  activeUnderline: {
+    backgroundColor: GOLD_ACCENT,
+    borderRadius: 1,
+    height: 2,
+    marginTop: 4,
+    width: '100%',
   },
   episodesList: {
-    gap: 12,
+    gap: 14,
   },
   episodeBlock: {
-    backgroundColor: 'rgba(245, 238, 225, 0.04)',
-    borderRadius: 10,
     overflow: 'hidden',
   },
   episodeRow: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: 16,
-    padding: 12,
+    paddingVertical: 8,
   },
   episodeStillWrap: {
     borderRadius: 8,
@@ -1488,21 +1463,6 @@ const styles = StyleSheet.create({
     height: '100%',
     width: '100%',
   },
-  epNumBadge: {
-    backgroundColor: 'rgba(4, 3, 1, 0.88)',
-    borderRadius: 4,
-    bottom: 6,
-    left: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    position: 'absolute',
-  },
-  epNumText: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '800',
-  },
   episodeInfo: {
     flex: 1,
   },
@@ -1513,7 +1473,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   episodeMeta: {
-    color: GOLD_ACCENT,
+    color: '#B5AFA4',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
     marginTop: 2,
@@ -1531,9 +1491,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   epSourcesDrawer: {
-    backgroundColor: 'rgba(245, 238, 225, 0.06)',
     gap: 8,
-    padding: 12,
+    paddingVertical: 10,
   },
   epSourceItem: {
     alignItems: 'center',
@@ -1552,7 +1511,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   castCard: {
-    backgroundColor: 'rgba(245, 238, 225, 0.05)',
     padding: 8,
     width: 132,
   },

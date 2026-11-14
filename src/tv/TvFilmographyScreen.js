@@ -6,7 +6,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { TvFocusable } from './TvFocusable';
 import { TvContentRail } from './TvContentRail';
 import { TvPosterCard } from './TvPosterCard';
@@ -43,27 +42,27 @@ export function TvFilmographyScreen({
       {/* Top Bar */}
       <View style={styles.topBar}>
         <TvFocusable
+          appearance="text"
           hasTVPreferredFocus={true}
           onPress={onBack}
-          scaleOnFocus={1.05}
-          borderRadius={999}
+          scaleOnFocus={1.04}
+          borderRadius={6}
           style={styles.backBtn}
         >
-          <View style={styles.btnInner}>
-            <Ionicons name="arrow-back" size={15} color={GOLD_ACCENT} />
-            <Text style={styles.backBtnText}>Back</Text>
-          </View>
+          {({ focused }) => (
+            <Text style={[styles.backBtnText, focused && styles.textFocused]}>Back</Text>
+          )}
         </TvFocusable>
-        <Text style={styles.eyebrow}>FILMOGRAPHY DOSSIER</Text>
       </View>
 
-      {/* Person Hero Card */}
+      {/* Person Hero */}
       <View style={styles.heroCard}>
         <MediaArtwork uri={portrait} title={name} variant="person" style={styles.avatar} />
         <View style={styles.heroInfo}>
-          <Text style={styles.deptTag}>{department.toUpperCase()}</Text>
           <Text style={styles.nameText}>{name}</Text>
-          <Text style={styles.creditsCount}>{results.length} credited works</Text>
+          <Text style={styles.creditsCount}>
+            {department}  ·  {results.length} works
+          </Text>
           {biography ? (
             <Text numberOfLines={3} style={styles.bioText}>
               {biography}
@@ -82,9 +81,7 @@ export function TvFilmographyScreen({
           {rails.map((rail, idx) => (
             <TvContentRail
               key={rail.id || rail.title || idx}
-              eyebrow={rail.eyebrow || 'CAREER CREDITS'}
               title={rail.title}
-              subtitle={`${rail.items?.length || 0} titles`}
               data={rail.items || []}
               savedKeys={savedKeys}
               onSelectItem={onSelectItem}
@@ -94,7 +91,6 @@ export function TvFilmographyScreen({
 
           {results.length > 0 ? (
             <View style={styles.allSection}>
-              <Text style={styles.eyebrow}>COMPLETE CATALOGUE</Text>
               <Text style={styles.sectionTitle}>All Credits ({results.length})</Text>
               <View style={styles.gridWrap}>
                 {results.slice(0, 60).map((item, idx) => {
@@ -133,29 +129,20 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 64,
-    paddingTop: 20,
+    paddingTop: 18,
   },
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
+    marginBottom: 14,
     paddingHorizontal: TV_SPACE.overscanX,
   },
   backBtn: {
     alignItems: 'center',
-    backgroundColor: '#191610',
-    borderColor: 'rgba(212, 168, 83, 0.4)',
-    borderWidth: 1,
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-  },
-  btnInner: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   backBtnText: {
     color: GOLD_ACCENT,
@@ -163,24 +150,16 @@ const styles = StyleSheet.create({
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
+  textFocused: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   heroCard: {
     alignItems: 'center',
-    backgroundColor: '#0D0B07',
-    borderColor: '#25211B',
-    borderRadius: 14,
-    borderWidth: 1,
     flexDirection: 'row',
     gap: 22,
     marginBottom: 24,
     marginHorizontal: TV_SPACE.overscanX,
-    padding: 18,
   },
   avatar: {
     borderRadius: 12,
@@ -190,14 +169,6 @@ const styles = StyleSheet.create({
   heroInfo: {
     flex: 1,
   },
-  deptTag: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    marginBottom: 3,
-  },
   nameText: {
     color: '#F5EEE1',
     fontFamily: fonts.display,
@@ -205,10 +176,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   creditsCount: {
-    color: '#E6CD9C',
+    color: '#D8D2C7',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
-    marginTop: 3,
+    marginTop: 4,
   },
   bioText: {
     color: '#C7C1B7',

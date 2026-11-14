@@ -1,13 +1,12 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
-import { GOLD_ACCENT } from '../theme/programme';
-import { TV_FOCUS, TV_SELECTED } from './tvTheme';
+import { TV_FOCUS } from './tvTheme';
 
 /**
  * Core 10-Foot TV D-Pad Focusable Primitive.
  * Provides native Android TV D-pad focus handling (`focusable={true}`),
- * a 3dp warm-white (#FFF4DC) focus ring, soft halo glow (`boxShadow`),
- * outer scale lift on focus, and optional `hasTVPreferredFocus`.
+ * restrained scale lift, soft halo glow (`boxShadow`), and gentle highlight
+ * (`appearance="text"`) or hairline frame (`appearance="card"`).
  */
 export function TvFocusable({
   children,
@@ -19,11 +18,12 @@ export function TvFocusable({
   focusKey,
   disabled = false,
   hasTVPreferredFocus = false,
-  scaleOnFocus = TV_FOCUS.scale,
+  appearance = 'text', // 'text' | 'card'
+  scaleOnFocus,
   focusBorderColor = TV_FOCUS.ringColor,
-  focusBorderWidth = TV_FOCUS.ringWidth,
+  focusBorderWidth,
   focusBackgroundColor,
-  borderRadius = 10,
+  borderRadius = 8,
   style,
   focusedStyle,
   accessibilityLabel,
@@ -33,10 +33,14 @@ export function TvFocusable({
   const [focused, setFocused] = useState(false);
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
+  const isCard = appearance === 'card';
+  const defaultScale = isCard ? TV_FOCUS.scale : TV_FOCUS.scaleSmall;
+  const rawScale = scaleOnFocus !== undefined ? scaleOnFocus : defaultScale;
   const effectiveScale =
-    scaleOnFocus && scaleOnFocus > 1
-      ? Math.max(TV_FOCUS.scaleSmall, scaleOnFocus)
-      : 1;
+    rawScale && rawScale > 1 ? Math.max(TV_FOCUS.scaleSmall, rawScale) : 1;
+
+  const resolvedBorderWidth =
+    focusBorderWidth !== undefined ? focusBorderWidth : isCard ? TV_FOCUS.ringWidth : 0;
 
   const handleFocus = useCallback(
     (e) => {
@@ -74,16 +78,13 @@ export function TvFocusable({
 
   const flatStyle = StyleSheet.flatten(style) || {};
   const outerFlex = flatStyle.flex != null ? { flex: flatStyle.flex } : null;
-  const isGoldSelected =
-    flatStyle.backgroundColor === GOLD_ACCENT ||
-    flatStyle.backgroundColor === TV_SELECTED.fill;
 
   const resolvedFocusBg =
     focusBackgroundColor !== undefined
       ? focusBackgroundColor
-      : !isGoldSelected
-        ? TV_FOCUS.surface
-        : null;
+      : isCard
+        ? null
+        : TV_FOCUS.surface;
 
   return (
     <Animated.View
@@ -107,11 +108,11 @@ export function TvFocusable({
         testID={testID}
         style={({ pressed }) => [
           styles.base,
-          { borderRadius },
+          { borderRadius, borderWidth: resolvedBorderWidth },
           style,
           focused && {
             borderColor: focusBorderColor,
-            borderWidth: focusBorderWidth,
+            borderWidth: resolvedBorderWidth,
             boxShadow: TV_FOCUS.glow,
           },
           focused && resolvedFocusBg ? { backgroundColor: resolvedFocusBg } : null,
@@ -131,7 +132,6 @@ export function TvFocusable({
 const styles = StyleSheet.create({
   base: {
     borderColor: 'transparent',
-    borderWidth: TV_FOCUS.ringWidth,
   },
   lifted: {
     elevation: 16,

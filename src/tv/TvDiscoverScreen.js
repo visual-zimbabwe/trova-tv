@@ -110,20 +110,20 @@ export function TvDiscoverScreen({
     >
       {/* Header */}
       <View style={styles.headerBlock}>
-        <View>
-          <Text style={styles.eyebrow}>DISCOVER STUDIO</Text>
-          <Text style={styles.title}>Browse by Taste & Criteria</Text>
-        </View>
+        <Text style={styles.title}>Discover</Text>
         <TvFocusable
+          appearance="text"
           onPress={() => {
             resetFilters?.();
             search?.();
           }}
           scaleOnFocus={1.04}
-          borderRadius={999}
+          borderRadius={6}
           style={styles.resetBtn}
         >
-          <Text style={styles.resetBtnText}>Reset All</Text>
+          {({ focused }) => (
+            <Text style={[styles.resetBtnText, focused && styles.textFocused]}>Reset All</Text>
+          )}
         </TvFocusable>
       </View>
 
@@ -133,40 +133,64 @@ export function TvDiscoverScreen({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
       >
-        <TvFocusable
-          hasTVPreferredFocus={true}
-          onPress={() => applyAndSearch({ mediaType: 'movie' })}
-          scaleOnFocus={1.04}
-          borderRadius={999}
-          style={[styles.pill, currentMediaType === 'movie' && styles.pillActive]}
-        >
-          <Text style={[styles.pillText, currentMediaType === 'movie' && styles.pillTextActive]}>
-            Films
-          </Text>
-        </TvFocusable>
-
-        <TvFocusable
-          onPress={() => applyAndSearch({ mediaType: 'tv' })}
-          scaleOnFocus={1.04}
-          borderRadius={999}
-          style={[styles.pill, currentMediaType === 'tv' && styles.pillActive]}
-        >
-          <Text style={[styles.pillText, currentMediaType === 'tv' && styles.pillTextActive]}>
-            TV Series
-          </Text>
-        </TvFocusable>
+        {[
+          { key: 'movie', label: 'Films', pref: true },
+          { key: 'tv', label: 'TV Series' },
+        ].map((m) => {
+          const active = currentMediaType === m.key;
+          return (
+            <TvFocusable
+              key={m.key}
+              appearance="text"
+              hasTVPreferredFocus={Boolean(m.pref)}
+              onPress={() => applyAndSearch({ mediaType: m.key })}
+              scaleOnFocus={1.04}
+              borderRadius={6}
+              style={styles.pill}
+            >
+              {({ focused }) => (
+                <View style={styles.pillInner}>
+                  <Text
+                    style={[
+                      styles.pillText,
+                      active && styles.pillTextActive,
+                      focused && styles.textFocused,
+                    ]}
+                  >
+                    {m.label}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
+            </TvFocusable>
+          );
+        })}
 
         {SORT_PRESETS.map((s) => {
           const active = currentSort === s.key;
           return (
             <TvFocusable
               key={s.key}
+              appearance="text"
               onPress={() => applyAndSearch({ sortBy: s.key })}
               scaleOnFocus={1.04}
-              borderRadius={999}
-              style={[styles.pill, active && styles.pillActive]}
+              borderRadius={6}
+              style={styles.pill}
             >
-              <Text style={[styles.pillText, active && styles.pillTextActive]}>{s.label}</Text>
+              {({ focused }) => (
+                <View style={styles.pillInner}>
+                  <Text
+                    style={[
+                      styles.pillText,
+                      active && styles.pillTextActive,
+                      focused && styles.textFocused,
+                    ]}
+                  >
+                    {s.label}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
             </TvFocusable>
           );
         })}
@@ -176,12 +200,26 @@ export function TvDiscoverScreen({
           return (
             <TvFocusable
               key={r.label}
+              appearance="text"
               onPress={() => applyAndSearch({ minRating: r.min })}
               scaleOnFocus={1.04}
-              borderRadius={999}
-              style={[styles.pill, active && styles.pillActive]}
+              borderRadius={6}
+              style={styles.pill}
             >
-              <Text style={[styles.pillText, active && styles.pillTextActive]}>{r.label}</Text>
+              {({ focused }) => (
+                <View style={styles.pillInner}>
+                  <Text
+                    style={[
+                      styles.pillText,
+                      active && styles.pillTextActive,
+                      focused && styles.textFocused,
+                    ]}
+                  >
+                    {r.label}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
             </TvFocusable>
           );
         })}
@@ -198,16 +236,30 @@ export function TvDiscoverScreen({
           return (
             <TvFocusable
               key={l.label}
+              appearance="text"
               onPress={() =>
                 applyAndSearch({
                   languageCodes: l.code ? [l.code] : [],
                 })
               }
               scaleOnFocus={1.04}
-              borderRadius={999}
-              style={[styles.pill, active && styles.pillActive]}
+              borderRadius={6}
+              style={styles.pill}
             >
-              <Text style={[styles.pillText, active && styles.pillTextActive]}>{l.label}</Text>
+              {({ focused }) => (
+                <View style={styles.pillInner}>
+                  <Text
+                    style={[
+                      styles.pillText,
+                      active && styles.pillTextActive,
+                      focused && styles.textFocused,
+                    ]}
+                  >
+                    {l.label}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
             </TvFocusable>
           );
         })}
@@ -217,12 +269,26 @@ export function TvDiscoverScreen({
           return (
             <TvFocusable
               key={d.label}
+              appearance="text"
               onPress={() => applyAndSearch({ fromYear: d.from, toYear: d.to })}
               scaleOnFocus={1.04}
-              borderRadius={999}
-              style={[styles.pill, active && styles.pillActive]}
+              borderRadius={6}
+              style={styles.pill}
             >
-              <Text style={[styles.pillText, active && styles.pillTextActive]}>{d.label}</Text>
+              {({ focused }) => (
+                <View style={styles.pillInner}>
+                  <Text
+                    style={[
+                      styles.pillText,
+                      active && styles.pillTextActive,
+                      focused && styles.textFocused,
+                    ]}
+                  >
+                    {d.label}
+                  </Text>
+                  {active ? <View style={styles.activeUnderline} /> : null}
+                </View>
+              )}
             </TvFocusable>
           );
         })}
@@ -241,6 +307,7 @@ export function TvDiscoverScreen({
             return (
               <TvFocusable
                 key={g.id}
+                appearance="text"
                 onPress={() => {
                   toggleGenre?.(g.id);
                   const currentList = filters.genreIds || [];
@@ -250,22 +317,24 @@ export function TvDiscoverScreen({
                   search?.({ ...filters, genreIds: nextGenres });
                 }}
                 scaleOnFocus={1.04}
-                borderRadius={999}
-                style={[
-                  styles.pill,
-                  included && styles.pillActive,
-                  excluded && styles.pillExcluded,
-                ]}
+                borderRadius={6}
+                style={styles.pill}
               >
-                <Text
-                  style={[
-                    styles.pillText,
-                    included && styles.pillTextActive,
-                    excluded && { color: '#FF6961' },
-                  ]}
-                >
-                  {excluded ? `Excl. ${g.name}` : g.name}
-                </Text>
+                {({ focused }) => (
+                  <View style={styles.pillInner}>
+                    <Text
+                      style={[
+                        styles.pillText,
+                        included && styles.pillTextActive,
+                        excluded && { color: '#FF6961' },
+                        focused && styles.textFocused,
+                      ]}
+                    >
+                      {excluded ? `Excl. ${g.name}` : g.name}
+                    </Text>
+                    {included ? <View style={styles.activeUnderline} /> : null}
+                  </View>
+                )}
               </TvFocusable>
             );
           })}
@@ -311,16 +380,19 @@ export function TvDiscoverScreen({
       {hasMore && displayItems.length > 0 ? (
         <View style={styles.loadMoreWrap}>
           <TvFocusable
+            appearance="text"
             onPress={loadMore}
             scaleOnFocus={1.04}
-            borderRadius={999}
+            borderRadius={8}
             style={styles.loadMoreBtn}
           >
-            {loadingMore ? (
-              <ActivityIndicator size="small" color="#1A1204" />
-            ) : (
-              <Text style={styles.loadMoreText}>Load More</Text>
-            )}
+            {({ focused }) =>
+              loadingMore ? (
+                <ActivityIndicator size="small" color={GOLD_ACCENT} />
+              ) : (
+                <Text style={[styles.loadMoreText, focused && styles.textFocused]}>Load More</Text>
+              )
+            }
           </TvFocusable>
         </View>
       ) : null}
@@ -335,21 +407,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 64,
-    paddingTop: 20,
+    paddingTop: 14,
   },
   headerBlock: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 10,
     paddingHorizontal: TV_SPACE.overscanX,
-  },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
   },
   title: {
     color: '#F5EEE1',
@@ -359,11 +424,10 @@ const styles = StyleSheet.create({
   },
   resetBtn: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.10)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   resetBtnText: {
     color: GOLD_ACCENT,
@@ -371,37 +435,45 @@ const styles = StyleSheet.create({
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
+  textFocused: {
+    color: '#FFFFFF',
+    fontFamily: fonts.heading,
+    fontWeight: '800',
+  },
   filterRow: {
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
+    gap: 12,
+    marginBottom: 6,
     paddingHorizontal: TV_SPACE.overscanX,
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   pill: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
     justifyContent: 'center',
     minHeight: TV_SPACE.chipMin,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  pillActive: {
-    backgroundColor: GOLD_ACCENT,
-  },
-  pillExcluded: {
-    backgroundColor: 'rgba(255, 105, 97, 0.16)',
+  pillInner: {
+    alignItems: 'center',
   },
   pillText: {
-    color: '#E6E1D7',
+    color: '#ABA59B',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   pillTextActive: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
     fontFamily: fonts.heading,
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  activeUnderline: {
+    backgroundColor: GOLD_ACCENT,
+    borderRadius: 1,
+    height: 2,
+    marginTop: 4,
+    width: '100%',
   },
   centerBox: {
     alignItems: 'center',
@@ -426,14 +498,13 @@ const styles = StyleSheet.create({
   },
   loadMoreBtn: {
     alignItems: 'center',
-    backgroundColor: GOLD_ACCENT,
     justifyContent: 'center',
     minHeight: TV_SPACE.targetMin,
-    paddingHorizontal: 28,
-    paddingVertical: 11,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
   },
   loadMoreText: {
-    color: '#140F06',
+    color: GOLD_ACCENT,
     fontFamily: fonts.heading,
     fontSize: TV_TYPE.button,
     fontWeight: '800',

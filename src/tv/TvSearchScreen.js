@@ -7,7 +7,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { TvFocusable } from './TvFocusable';
 import { TvPosterCard } from './TvPosterCard';
 import { TvContentRail } from './TvContentRail';
@@ -109,8 +108,7 @@ export function TvSearchScreen({
     <View style={styles.splitRoot}>
       {/* Left Pane: D-Pad On-Screen Keyboard */}
       <View style={styles.leftKeyboardPane}>
-        <Text style={styles.eyebrow}>SEARCH</Text>
-        <Text style={styles.paneTitle}>Title, Actor or Director</Text>
+        <Text style={styles.paneTitle}>Search</Text>
 
         {/* Query Display Box */}
         <View style={styles.queryBox}>
@@ -118,7 +116,7 @@ export function TvSearchScreen({
             value={query}
             onChangeText={onQueryChange}
             onSubmitEditing={() => onSubmitSearch?.(query)}
-            placeholder="Type or speak..."
+            placeholder="Title, actor or director..."
             placeholderTextColor="#68635A"
             style={styles.queryInput}
           />
@@ -128,34 +126,51 @@ export function TvSearchScreen({
         {/* Action Row: Space, Del, Clear */}
         <View style={styles.specialKeysRow}>
           <TvFocusable
+            appearance="text"
             hasTVPreferredFocus={true}
             onPress={() => appendChar(' ')}
             scaleOnFocus={1.04}
-            borderRadius={8}
+            borderRadius={6}
             style={[styles.specialKey, { flex: 1.4 }]}
             accessibilityLabel="Space"
           >
-            <Text style={styles.specialKeyText}>SPACE</Text>
+            {({ focused }) => (
+              <Text style={[styles.specialKeyText, focused && styles.keyTextFocused]}>Space</Text>
+            )}
           </TvFocusable>
 
           <TvFocusable
+            appearance="text"
             onPress={handleBackspace}
             scaleOnFocus={1.04}
-            borderRadius={8}
+            borderRadius={6}
             style={[styles.specialKey, { flex: 1 }]}
             accessibilityLabel="Backspace"
           >
-            <Text style={styles.specialKeyText}>DEL</Text>
+            {({ focused }) => (
+              <Text style={[styles.specialKeyText, focused && styles.keyTextFocused]}>Delete</Text>
+            )}
           </TvFocusable>
 
           <TvFocusable
+            appearance="text"
             onPress={handleClear}
             scaleOnFocus={1.04}
-            borderRadius={8}
+            borderRadius={6}
             style={[styles.specialKey, { flex: 1 }]}
             accessibilityLabel="Clear search"
           >
-            <Text style={[styles.specialKeyText, { color: GOLD_ACCENT }]}>CLEAR</Text>
+            {({ focused }) => (
+              <Text
+                style={[
+                  styles.specialKeyText,
+                  { color: GOLD_ACCENT },
+                  focused && styles.keyTextFocused,
+                ]}
+              >
+                Clear
+              </Text>
+            )}
           </TvFocusable>
         </View>
 
@@ -164,10 +179,10 @@ export function TvSearchScreen({
           {KEYBOARD_KEYS.map((letter) => (
             <TvFocusable
               key={letter}
+              appearance="text"
               onPress={() => appendChar(letter)}
-              scaleOnFocus={1.08}
-              borderRadius={7}
-              focusBackgroundColor={GOLD_ACCENT}
+              scaleOnFocus={1.05}
+              borderRadius={6}
               style={styles.keyCell}
               accessibilityLabel={`Key ${letter}`}
             >
@@ -179,17 +194,19 @@ export function TvSearchScreen({
         </View>
 
         {/* Quick Search Suggestions */}
-        <Text style={styles.quickHeader}>SUGGESTIONS</Text>
         <View style={styles.quickChipsWrap}>
           {QUICK_SEARCHES.map((term) => (
             <TvFocusable
               key={term}
+              appearance="text"
               onPress={() => onQueryChange?.(term)}
               scaleOnFocus={1.04}
-              borderRadius={999}
+              borderRadius={6}
               style={styles.quickChip}
             >
-              <Text style={styles.quickChipText}>{term}</Text>
+              {({ focused }) => (
+                <Text style={[styles.quickChipText, focused && styles.keyTextFocused]}>{term}</Text>
+              )}
             </TvFocusable>
           ))}
         </View>
@@ -203,7 +220,6 @@ export function TvSearchScreen({
       >
         {hasQuery ? (
           <View style={styles.resultsSection}>
-            <Text style={styles.eyebrow}>MATCHES</Text>
             <Text style={styles.resultsHeading}>
               Results for “{query.trim()}” ({titles.length + people.length})
             </Text>
@@ -220,6 +236,7 @@ export function TvSearchScreen({
                   {people.map((person, idx) => (
                     <TvFocusable
                       key={`p-${person.personId || person.tmdbId || idx}`}
+                      appearance="text"
                       onPress={() => onSelectPerson?.(person)}
                       scaleOnFocus={1.04}
                       borderRadius={10}
@@ -284,9 +301,7 @@ export function TvSearchScreen({
           <View style={{ paddingTop: 14 }}>
             {recentViewed && recentViewed.length > 0 ? (
               <TvContentRail
-                eyebrow="RECENTLY VIEWED"
                 title="Jump Back In"
-                subtitle={`${recentViewed.length} titles`}
                 data={recentViewed}
                 savedKeys={savedKeys}
                 onSeeAll={onClearRecent}
@@ -297,8 +312,7 @@ export function TvSearchScreen({
 
             {trending.length > 0 ? (
               <TvContentRail
-                eyebrow="COMMUNITY PULSE"
-                title="Trending on Trakt"
+                title="Trending Now"
                 data={trending.slice(0, 12)}
                 showRank={true}
                 savedKeys={savedKeys}
@@ -309,8 +323,7 @@ export function TvSearchScreen({
 
             {nowPlaying.length > 0 ? (
               <TvContentRail
-                eyebrow="IN THEATERS"
-                title="Now Playing in Theaters"
+                title="Now Playing in Cinemas"
                 data={nowPlaying.slice(0, 15)}
                 savedKeys={savedKeys}
                 onSelectItem={onSelectItem}
@@ -331,34 +344,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   leftKeyboardPane: {
-    backgroundColor: '#070503',
-    paddingHorizontal: 18,
+    backgroundColor: '#040301',
+    paddingHorizontal: TV_SPACE.overscanX,
     paddingVertical: 14,
-    width: 304,
-  },
-  eyebrow: {
-    color: GOLD_ACCENT,
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.4,
-    marginBottom: 2,
+    width: 320,
   },
   paneTitle: {
     color: '#F5EEE1',
-    fontFamily: fonts.heading,
-    fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.display,
+    fontSize: TV_TYPE.h1,
+    fontWeight: '800',
     marginBottom: 10,
   },
   queryBox: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.10)',
-    borderRadius: 10,
+    borderBottomColor: 'rgba(245, 238, 225, 0.22)',
+    borderBottomWidth: 1,
     flexDirection: 'row',
     height: 44,
-    marginBottom: 10,
-    paddingHorizontal: 14,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   queryInput: {
     color: '#F5EEE1',
@@ -374,15 +379,14 @@ const styles = StyleSheet.create({
   },
   specialKey: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
     height: 38,
     justifyContent: 'center',
   },
   specialKeyText: {
-    color: '#F5EEE1',
+    color: '#ABA59B',
     fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
+    fontSize: TV_TYPE.meta,
+    fontWeight: '600',
   },
   keyGrid: {
     flexDirection: 'row',
@@ -392,28 +396,19 @@ const styles = StyleSheet.create({
   },
   keyCell: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.06)',
     height: 36,
     justifyContent: 'center',
     width: 39,
   },
   keyText: {
-    color: '#F5EEE1',
+    color: '#D8D2C7',
     fontFamily: fonts.heading,
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
   },
   keyTextFocused: {
-    color: '#140F06',
+    color: '#FFFFFF',
     fontWeight: '800',
-  },
-  quickHeader: {
-    color: '#B5AFA4',
-    fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.1,
-    marginBottom: 6,
   },
   quickChipsWrap: {
     flexDirection: 'row',
@@ -422,17 +417,16 @@ const styles = StyleSheet.create({
   },
   quickChip: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.08)',
     justifyContent: 'center',
-    minHeight: 36,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    minHeight: 34,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   quickChipText: {
-    color: '#E6CD9C',
+    color: '#ABA59B',
     fontFamily: fonts.label,
-    fontSize: TV_TYPE.eyebrow,
-    fontWeight: '700',
+    fontSize: TV_TYPE.meta,
+    fontWeight: '600',
   },
   rightResultsPane: {
     flex: 1,
@@ -442,7 +436,7 @@ const styles = StyleSheet.create({
   },
   resultsSection: {
     paddingHorizontal: TV_SPACE.overscanX,
-    paddingTop: 18,
+    paddingTop: 14,
   },
   resultsHeading: {
     color: '#F5EEE1',
@@ -455,7 +449,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   subHeader: {
-    color: '#E6CD9C',
+    color: '#D8D2C7',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.meta,
     fontWeight: '700',
@@ -466,8 +460,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   personCard: {
-    backgroundColor: 'rgba(245, 238, 225, 0.06)',
-    padding: 10,
+    padding: 8,
     width: 210,
   },
   personCardInner: {
@@ -487,7 +480,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   personDept: {
-    color: GOLD_ACCENT,
+    color: '#B5AFA4',
     fontFamily: fonts.label,
     fontSize: TV_TYPE.eyebrow,
     marginTop: 2,
@@ -499,8 +492,6 @@ const styles = StyleSheet.create({
   },
   emptyBox: {
     alignItems: 'center',
-    backgroundColor: 'rgba(245, 238, 225, 0.03)',
-    borderRadius: 14,
     marginTop: 24,
     padding: 36,
   },
