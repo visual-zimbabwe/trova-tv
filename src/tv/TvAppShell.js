@@ -12,7 +12,10 @@ import { TvWatchlistScreen } from './TvWatchlistScreen';
 import { TvDownloadsScreen } from './TvDownloadsScreen';
 import { TvSettingsScreen } from './TvSettingsScreen';
 import { useDownloads } from '../lib/downloadManager';
-import { searchMovieTorrents } from '../lib/torrentSearchEngine';
+import {
+  isDeadOrArchiveStream,
+  searchMovieTorrents,
+} from '../lib/torrentSearchEngine';
 import { launchStream } from '../lib/streamLauncher';
 import { trovaToast as toastiva } from '../lib/trovaToast';
 import { useToastContext } from '../context/ToastContext';
@@ -104,17 +107,24 @@ export function TvAppShell({
       handleOpenItem(item);
       if (item.mediaType !== 'tv') {
         const title = item.title || item.Title;
+        const originalTitle = item.originalTitle || title;
         const year = item.year || item.Year;
         const imdbId = item.imdbId || item.imdbID;
         if (title) {
           toastiva.info(`Resolving best 1080p/4K swarm for ${title}...`);
-          const found = await searchMovieTorrents({ title, year, imdbId }).catch(() => []);
+          const found = await searchMovieTorrents({
+            title,
+            originalTitle,
+            year,
+            imdbId,
+          }).catch(() => []);
           if (found && found.length > 0) {
-            const best = found[0];
+            const best = found.find((s) => !isDeadOrArchiveStream(s)) || found[0];
             await launchStream({
               magnetUrl: best.magnetUrl,
               title: best.name,
               mediaTitle: title,
+              originalTitle,
               year,
               tmdbId: item.tmdbId,
               fileIdx: best.fileIdx,
