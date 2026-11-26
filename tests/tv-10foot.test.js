@@ -76,3 +76,19 @@ test('10-foot TV surfaces expose TvFocusable D-pad navigation across all 10 scre
   assert.match(focusableSource, /hasTVPreferredFocus/);
   assert.match(focusableSource, /focusable=\{!disabled\}/);
 });
+
+test('TV stream surfaces wire swarm health badges, dead/archive toggle, and season-pack fallback', () => {
+  const detailSrc = read('src/tv/TvDetailScreen.js');
+  assert.match(detailSrc, /isDeadOrArchiveStream/);
+  assert.match(detailSrc, /health\?\.badge/);
+  assert.match(detailSrc, /isSeasonPackFallback/);
+  assert.match(detailSrc, /SEASON PACK/);
+  assert.match(detailSrc, /Show \$\{hiddenDeadStreamsCount\} dead \/ archive/);
+  assert.match(detailSrc, /Show \$\{hiddenEpDead\} dead \/ archive/);
+
+  const shellSrc = read('src/tv/TvAppShell.js');
+  assert.match(shellSrc, /isDeadOrArchiveStream/);
+
+  const launcherSrc = read('src/lib/streamLauncher.js');
+  assert.match(launcherSrc, /&season=\$\{encodeURIComponent\(String\(season\)\)\}&episode=\$\{encodeURIComponent\(String\(episode\)\)\}/);
+});

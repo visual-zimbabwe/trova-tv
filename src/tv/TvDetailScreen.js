@@ -21,6 +21,7 @@ import {
   fetchTitleRails,
 } from '../lib/tmdb';
 import {
+  isDeadOrArchiveStream,
   searchEpisodeTorrents,
   searchMovieTorrents,
   searchSeasonPackTorrents,
@@ -63,6 +64,7 @@ export function TvDetailScreen({
   const [streams, setStreams] = useState([]);
   const [streamsLoading, setStreamsLoading] = useState(false);
   const [showAllStreams, setShowAllStreams] = useState(false);
+  const [showDeadStreams, setShowDeadStreams] = useState(false);
   const [launchingKey, setLaunchingKey] = useState(null);
   const [trailerOpen, setTrailerOpen] = useState(false);
 
@@ -76,7 +78,10 @@ export function TvDetailScreen({
   const [episodes, setEpisodes] = useState([]);
   const [episodesLoading, setEpisodesLoading] = useState(false);
   const [seasonPacks, setSeasonPacks] = useState([]);
+  const [showSeasonPacksDrawer, setShowSeasonPacksDrawer] = useState(false);
+  const [showDeadSeasonPacks, setShowDeadSeasonPacks] = useState(false);
   const [episodeSwarms, setEpisodeSwarms] = useState({});
+  const [showDeadEpisodeSwarms, setShowDeadEpisodeSwarms] = useState({});
   const [loadingEpisodeNum, setLoadingEpisodeNum] = useState(null);
   const [expandedEpisodeNum, setExpandedEpisodeNum] = useState(null);
 
@@ -120,14 +125,17 @@ export function TvDetailScreen({
     let cancelled = false;
     if (mediaType === 'movie' && title && title !== 'Untitled') {
       setStreamsLoading(true);
-      searchMovieTorrents({ title, year, imdbId })
+      setShowDeadStreams(false);
+      searchMovieTorrents({ title, originalTitle, year, imdbId })
         .then((res) => {
           if (!cancelled) {
-            setStreams(res || []);
+            const list = res || [];
+            setStreams(list);
             setStreamsLoading(false);
-            if (res?.[0]?.magnetUrl && res[0].seeders > 0) {
+            const best = list.find((s) => !isDeadOrArchiveStream(s)) || list[0];
+            if (best?.magnetUrl && best.seeders > 0) {
               fetch(
-                `http://127.0.0.1:8899/preload?magnet=${encodeURIComponent(res[0].magnetUrl)}`,
+                `http://127.0.0.1:8899/preload?magnet=${encodeURIComponent(best.magnetUrl)}`,
               ).catch(() => {});
             }
           }
@@ -139,13 +147,16 @@ export function TvDetailScreen({
     return () => {
       cancelled = true;
     };
-  }, [mediaType, title, year, imdbId]);
+  }, [mediaType, title, originalTitle, year, imdbId]);
 
   // Fetch TV Season episodes + Season Pack torrents when viewing a series
   useEffect(() => {
     let cancelled = false;
     if (mediaType === 'tv' && tmdbId && selectedSeasonNum != null) {
       setEpisodesLoading(true);
+      setShowSeasonPacksDrawer(false);
+      setShowDeadSeasonPacks(false);
+      setShowDeadEpisodeSwarms({});
       fetchSeasonEpisodes(tmdbId, selectedSeasonNum)
         .then((eps) => {
           if (!cancelled) {
@@ -159,6 +170,7 @@ export function TvDetailScreen({
 
       searchSeasonPackTorrents({
         seriesTitle: title,
+        originalTitle,
         seasonNumber: selectedSeasonNum,
         imdbId,
       })
@@ -170,7 +182,7 @@ export function TvDetailScreen({
     return () => {
       cancelled = true;
     };
-  }, [mediaType, tmdbId, selectedSeasonNum, title, imdbId]);
+  }, [mediaType, tmdbId, selectedSeasonNum, title, originalTitle, imdbId]);
 
   // Fetch recommendations, similar titles, and franchise collection
   useEffect(() => {
@@ -236,7 +248,7 @@ export function TvDetailScreen({
       const epNum = ep.episodeNumber;
       const existing = episodeSwarms[epNum];
       if (existing && existing.length > 0) {
-        const best = existing[0];
+        const best = existing.find((s) => !isDeadOrArchiveStream(s)) || existing[0];
         await launchStream({
           magnetUrl: best.magnetUrl,
           title: best.name,
@@ -256,13 +268,14 @@ export function TvDetailScreen({
       try {
         const found = await searchEpisodeTorrents({
           seriesTitle: title,
+          originalTitle,
           seasonNumber: selectedSeasonNum,
           episodeNumber: epNum,
           imdbId,
         });
         setEpisodeSwarms((prev) => ({ ...prev, [epNum]: found || [] }));
         if (found && found.length > 0) {
-          const best = found[0];
+          const best = found.find((s) => !isDeadOrArchiveStream(s)) || found[0];
           await launchStream({
             magnetUrl: best.magnetUrl,
             title: best.name,
@@ -298,6 +311,7 @@ export function TvDetailScreen({
         try {
           const found = await searchEpisodeTorrents({
             seriesTitle: title,
+            originalTitle,
             seasonNumber: selectedSeasonNum,
             episodeNumber: epNum,
             imdbId,
@@ -308,7 +322,7 @@ export function TvDetailScreen({
         }
       }
     },
-    [expandedEpisodeNum, episodeSwarms, title, selectedSeasonNum, imdbId],
+    [expandedEpisodeNum, episodeSwarms, title, originalTitle, selectedSeasonNum, imdbId],
   );
 
   if (loading && !result) {
@@ -354,8 +368,17 @@ export function TvDetailScreen({
 
   if (!result) return null;
 
-  const topStream = streams[0] || null;
-  const topSeasonPack = seasonPacks[0] || null;
+  const healthyStreams = streams.filter((s) => !isDeadOrArchiveStream(s));
+  const hiddenDeadStreamsCount = streams.length - healthyStreams.length;
+  const visibleStreams =
+    showDeadStreams || !healthyStreams.length ? streams : healthyStreams;
+  const topStream = healthyStreams[0] || streams[0] || null;
+
+  const healthySeasonPacks = seasonPacks.filter((p) => !isDeadOrArchiveStream(p));
+  const hiddenDeadPacksCount = seasonPacks.length - healthySeasonPacks.length;
+  const visibleSeasonPacks =
+    showDeadSeasonPacks || !healthySeasonPacks.length ? seasonPacks : healthySeasonPacks;
+  const topSeasonPack = healthySeasonPacks[0] || seasonPacks[0] || null;
   const trailerCandidates =
     Array.isArray(result.trailerCandidates) && result.trailerCandidates.length > 0
       ? result.trailerCandidates
@@ -769,24 +792,37 @@ export function TvDetailScreen({
         <View style={styles.sectionBlock}>
           <Text style={styles.sectionTitle}>Releases</Text>
           <View style={styles.releasesList}>
-            {streams.slice(0, 14).map((rel, idx) => (
+            {visibleStreams.slice(0, 18).map((rel, idx) => (
               <View key={`${rel.infoHash || idx}`} style={styles.releaseRow}>
                 <View style={{ flex: 1, paddingRight: 12 }}>
                   <Text numberOfLines={1} style={styles.releaseName}>
                     {rel.name}
                   </Text>
-                  <Text style={styles.releaseMeta}>
-                    {[
-                      rel.attributes?.resolution,
-                      rel.attributes?.codec,
-                      rel.attributes?.hdr,
-                      rel.sizeFormatted,
-                      `${rel.seeders} seeders`,
-                      rel.source,
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
+                  <View style={styles.releaseMetaRow}>
+                    {rel.health?.badge ? (
+                      <Text
+                        style={[
+                          styles.healthBadgeText,
+                          { color: rel.health.color || GOLD_ACCENT },
+                        ]}
+                      >
+                        {rel.health.badge}
+                      </Text>
+                    ) : null}
+                    <Text numberOfLines={1} style={styles.releaseMeta}>
+                      {[
+                        rel.attributes?.resolution,
+                        rel.attributes?.codec,
+                        rel.attributes?.hdr,
+                        rel.attributes?.audioBadge?.text,
+                        rel.formattedSize || rel.sizeFormatted,
+                        `${rel.scrapeVerified ? '' : '~'}${rel.seeders} seeders`,
+                        rel.source,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
+                  </View>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <TvFocusable
@@ -830,6 +866,28 @@ export function TvDetailScreen({
                 </View>
               </View>
             ))}
+            {hiddenDeadStreamsCount > 0 && healthyStreams.length > 0 ? (
+              <View style={styles.toggleDeadRow}>
+                <TvFocusable
+                  appearance="text"
+                  onPress={() => setShowDeadStreams((prev) => !prev)}
+                  scaleOnFocus={1.03}
+                  borderRadius={6}
+                  style={styles.smallOutlineBtn}
+                  accessibilityLabel={
+                    showDeadStreams ? 'Hide dead and archive swarms' : 'Show all swarms'
+                  }
+                >
+                  {({ focused }) => (
+                    <Text style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}>
+                      {showDeadStreams
+                        ? 'Hide dead / archive swarms'
+                        : `Show ${hiddenDeadStreamsCount} dead / archive swarm${hiddenDeadStreamsCount === 1 ? '' : 's'}`}
+                    </Text>
+                  )}
+                </TvFocusable>
+              </View>
+            ) : null}
           </View>
         </View>
       ) : null}
@@ -840,33 +898,132 @@ export function TvDetailScreen({
           <View style={styles.seasonHeaderRow}>
             <Text style={styles.sectionTitle}>Episodes</Text>
             {topSeasonPack ? (
-              <TvFocusable
-                appearance="text"
-                onPress={() =>
-                  launchStream({
-                    magnetUrl: topSeasonPack.magnetUrl,
-                    title: topSeasonPack.name,
-                    mediaTitle: `${title} Season ${selectedSeasonNum}`,
-                    originalTitle,
-                    year,
-                    tmdbId,
-                    fileIdx: 0,
-                    imdbId,
-                    season: selectedSeasonNum,
-                    episode: 1,
-                  })
-                }
-                borderRadius={6}
-                style={styles.smallOutlineBtn}
-              >
-                {({ focused }) => (
-                  <Text style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}>
-                    Season {selectedSeasonNum} Pack
-                  </Text>
-                )}
-              </TvFocusable>
+              <View style={styles.seasonPackActions}>
+                <TvFocusable
+                  appearance="text"
+                  onPress={() =>
+                    launchStream({
+                      magnetUrl: topSeasonPack.magnetUrl,
+                      title: topSeasonPack.name,
+                      mediaTitle: `${title} Season ${selectedSeasonNum}`,
+                      originalTitle,
+                      year,
+                      tmdbId,
+                      fileIdx: 0,
+                      imdbId,
+                      season: selectedSeasonNum,
+                      episode: 1,
+                    })
+                  }
+                  borderRadius={6}
+                  style={styles.smallGoldBtn}
+                >
+                  {({ focused }) => (
+                    <Text style={[styles.smallGoldBtnText, focused && styles.textBtnFocused]}>
+                      {`Play Season ${selectedSeasonNum} Pack${topSeasonPack.health?.badge ? ` · ${topSeasonPack.health.badge}` : ''}`}
+                    </Text>
+                  )}
+                </TvFocusable>
+                {seasonPacks.length > 0 ? (
+                  <TvFocusable
+                    appearance="text"
+                    onPress={() => setShowSeasonPacksDrawer((prev) => !prev)}
+                    borderRadius={6}
+                    style={styles.smallOutlineBtn}
+                  >
+                    {({ focused }) => (
+                      <Text style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}>
+                        {showSeasonPacksDrawer
+                          ? 'Hide Packs'
+                          : `Season Packs (${seasonPacks.length})`}
+                      </Text>
+                    )}
+                  </TvFocusable>
+                ) : null}
+              </View>
             ) : null}
           </View>
+
+          {showSeasonPacksDrawer && seasonPacks.length > 0 ? (
+            <View style={styles.seasonPacksDrawer}>
+              {visibleSeasonPacks.slice(0, 10).map((pack, pIdx) => (
+                <View key={`${pack.infoHash || pIdx}`} style={styles.releaseRow}>
+                  <View style={{ flex: 1, paddingRight: 12 }}>
+                    <Text numberOfLines={1} style={styles.releaseName}>
+                      {pack.name}
+                    </Text>
+                    <View style={styles.releaseMetaRow}>
+                      {pack.health?.badge ? (
+                        <Text
+                          style={[
+                            styles.healthBadgeText,
+                            { color: pack.health.color || GOLD_ACCENT },
+                          ]}
+                        >
+                          {pack.health.badge}
+                        </Text>
+                      ) : null}
+                      <Text numberOfLines={1} style={styles.releaseMeta}>
+                        {[
+                          pack.attributes?.resolution,
+                          pack.attributes?.codec,
+                          pack.formattedSize || pack.sizeFormatted,
+                          `${pack.scrapeVerified ? '' : '~'}${pack.seeders} seeders`,
+                          pack.source,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                    </View>
+                  </View>
+                  <TvFocusable
+                    appearance="text"
+                    onPress={() =>
+                      launchStream({
+                        magnetUrl: pack.magnetUrl,
+                        title: pack.name,
+                        mediaTitle: `${title} Season ${selectedSeasonNum}`,
+                        originalTitle,
+                        year,
+                        tmdbId,
+                        fileIdx: 0,
+                        imdbId,
+                        season: selectedSeasonNum,
+                        episode: 1,
+                      })
+                    }
+                    borderRadius={6}
+                    style={styles.smallGoldBtn}
+                  >
+                    {({ focused }) => (
+                      <Text style={[styles.smallGoldBtnText, focused && styles.textBtnFocused]}>
+                        Play
+                      </Text>
+                    )}
+                  </TvFocusable>
+                </View>
+              ))}
+              {hiddenDeadPacksCount > 0 && healthySeasonPacks.length > 0 ? (
+                <View style={styles.toggleDeadRow}>
+                  <TvFocusable
+                    appearance="text"
+                    onPress={() => setShowDeadSeasonPacks((prev) => !prev)}
+                    scaleOnFocus={1.03}
+                    borderRadius={6}
+                    style={styles.smallOutlineBtn}
+                  >
+                    {({ focused }) => (
+                      <Text style={[styles.smallOutlineBtnText, focused && styles.textBtnFocused]}>
+                        {showDeadSeasonPacks
+                          ? 'Hide dead / archive packs'
+                          : `Show ${hiddenDeadPacksCount} dead / archive pack${hiddenDeadPacksCount === 1 ? '' : 's'}`}
+                      </Text>
+                    )}
+                  </TvFocusable>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
 
           {/* Horizontal Season Selector Text Tabs */}
           <ScrollView
@@ -989,82 +1146,147 @@ export function TvDetailScreen({
                     </View>
 
                     {/* Expanded Episode Swarm Releases */}
-                    {isEpExpanded && epSwarms.length > 0 ? (
-                      <View style={styles.epSourcesDrawer}>
-                        {epSwarms.slice(0, 6).map((rel, rIdx) => (
-                          <View key={`${rel.infoHash}-${rIdx}`} style={styles.epSourceItem}>
-                            <Text numberOfLines={1} style={styles.epSourceName}>
-                              {rel.name} ({rel.attributes?.resolution || 'HD'} · {rel.seeders}{' '}
-                              peers)
-                            </Text>
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                              <TvFocusable
-                                appearance="text"
-                                onPress={() =>
-                                  launchStream({
-                                    magnetUrl: rel.magnetUrl,
-                                    title: rel.name,
-                                    mediaTitle: `${title} S${String(selectedSeasonNum).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`,
-                                    originalTitle,
-                                    year,
-                                    tmdbId,
-                                    fileIdx: rel.fileIdx,
-                                    imdbId,
-                                    season: selectedSeasonNum,
-                                    episode: ep.episodeNumber,
-                                  })
-                                }
-                                borderRadius={6}
-                                style={styles.smallGoldBtn}
-                              >
-                                {({ focused }) => (
-                                  <Text
-                                    style={[
-                                      styles.smallGoldBtnText,
-                                      focused && styles.textBtnFocused,
-                                    ]}
+                    {isEpExpanded && epSwarms.length > 0
+                      ? (() => {
+                          const healthyEp = epSwarms.filter((s) => !isDeadOrArchiveStream(s));
+                          const hiddenEpDead = epSwarms.length - healthyEp.length;
+                          const showAllForEp = Boolean(showDeadEpisodeSwarms[ep.episodeNumber]);
+                          const visibleEp =
+                            showAllForEp || !healthyEp.length ? epSwarms : healthyEp;
+
+                          return (
+                            <View style={styles.epSourcesDrawer}>
+                              {visibleEp.slice(0, 10).map((rel, rIdx) => (
+                                <View key={`${rel.infoHash}-${rIdx}`} style={styles.epSourceItem}>
+                                  <View style={{ flex: 1, paddingRight: 12 }}>
+                                    <Text numberOfLines={1} style={styles.epSourceName}>
+                                      {rel.name}
+                                    </Text>
+                                    <View style={styles.releaseMetaRow}>
+                                      {rel.health?.badge ? (
+                                        <Text
+                                          style={[
+                                            styles.healthBadgeText,
+                                            { color: rel.health.color || GOLD_ACCENT },
+                                          ]}
+                                        >
+                                          {rel.health.badge}
+                                        </Text>
+                                      ) : null}
+                                      {rel.isSeasonPackFallback ? (
+                                        <Text style={styles.seasonPackBadgeText}>SEASON PACK</Text>
+                                      ) : null}
+                                      <Text numberOfLines={1} style={styles.releaseMeta}>
+                                        {[
+                                          rel.attributes?.resolution || 'HD',
+                                          rel.formattedSize || rel.sizeFormatted,
+                                          `${rel.scrapeVerified ? '' : '~'}${rel.seeders} seeds`,
+                                          rel.source,
+                                        ]
+                                          .filter(Boolean)
+                                          .join(' · ')}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                                    <TvFocusable
+                                      appearance="text"
+                                      onPress={() =>
+                                        launchStream({
+                                          magnetUrl: rel.magnetUrl,
+                                          title: rel.name,
+                                          mediaTitle: `${title} S${String(selectedSeasonNum).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`,
+                                          originalTitle,
+                                          year,
+                                          tmdbId,
+                                          fileIdx: rel.fileIdx,
+                                          imdbId,
+                                          season: selectedSeasonNum,
+                                          episode: ep.episodeNumber,
+                                        })
+                                      }
+                                      borderRadius={6}
+                                      style={styles.smallGoldBtn}
+                                    >
+                                      {({ focused }) => (
+                                        <Text
+                                          style={[
+                                            styles.smallGoldBtnText,
+                                            focused && styles.textBtnFocused,
+                                          ]}
+                                        >
+                                          Stream
+                                        </Text>
+                                      )}
+                                    </TvFocusable>
+                                    <TvFocusable
+                                      appearance="text"
+                                      onPress={() =>
+                                        startDownload({
+                                          magnet: rel.magnetUrl,
+                                          infoHash: rel.infoHash,
+                                          fileIdx: rel.fileIdx,
+                                          title: `${title} S${String(selectedSeasonNum).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`,
+                                          releaseName: rel.name,
+                                          mediaType: 'tv',
+                                          tmdbId,
+                                          imdbId,
+                                          season: selectedSeasonNum,
+                                          episode: ep.episodeNumber,
+                                          year,
+                                          posterUrl: posterUri,
+                                        })
+                                      }
+                                      borderRadius={6}
+                                      style={styles.smallOutlineBtn}
+                                    >
+                                      {({ focused }) => (
+                                        <Text
+                                          style={[
+                                            styles.smallOutlineBtnText,
+                                            focused && styles.textBtnFocused,
+                                          ]}
+                                        >
+                                          Download
+                                        </Text>
+                                      )}
+                                    </TvFocusable>
+                                  </View>
+                                </View>
+                              ))}
+                              {hiddenEpDead > 0 && healthyEp.length > 0 ? (
+                                <View style={styles.toggleDeadRow}>
+                                  <TvFocusable
+                                    appearance="text"
+                                    onPress={() =>
+                                      setShowDeadEpisodeSwarms((prev) => ({
+                                        ...prev,
+                                        [ep.episodeNumber]: !prev[ep.episodeNumber],
+                                      }))
+                                    }
+                                    scaleOnFocus={1.03}
+                                    borderRadius={6}
+                                    style={styles.smallOutlineBtn}
                                   >
-                                    Stream
-                                  </Text>
-                                )}
-                              </TvFocusable>
-                              <TvFocusable
-                                appearance="text"
-                                onPress={() =>
-                                  startDownload({
-                                    magnet: rel.magnetUrl,
-                                    infoHash: rel.infoHash,
-                                    fileIdx: rel.fileIdx,
-                                    title: `${title} S${String(selectedSeasonNum).padStart(2, '0')}E${String(ep.episodeNumber).padStart(2, '0')}`,
-                                    releaseName: rel.name,
-                                    mediaType: 'tv',
-                                    tmdbId,
-                                    imdbId,
-                                    season: selectedSeasonNum,
-                                    episode: ep.episodeNumber,
-                                    year,
-                                    posterUrl: posterUri,
-                                  })
-                                }
-                                borderRadius={6}
-                                style={styles.smallOutlineBtn}
-                              >
-                                {({ focused }) => (
-                                  <Text
-                                    style={[
-                                      styles.smallOutlineBtnText,
-                                      focused && styles.textBtnFocused,
-                                    ]}
-                                  >
-                                    Download
-                                  </Text>
-                                )}
-                              </TvFocusable>
+                                    {({ focused }) => (
+                                      <Text
+                                        style={[
+                                          styles.smallOutlineBtnText,
+                                          focused && styles.textBtnFocused,
+                                        ]}
+                                      >
+                                        {showAllForEp
+                                          ? 'Hide dead / archive swarms'
+                                          : `Show ${hiddenEpDead} dead / archive swarm${hiddenEpDead === 1 ? '' : 's'}`}
+                                      </Text>
+                                    )}
+                                  </TvFocusable>
+                                </View>
+                              ) : null}
                             </View>
-                          </View>
-                        ))}
-                      </View>
-                    ) : null}
+                          );
+                        })()
+                      : null}
                   </View>
                 );
               })}
@@ -1373,9 +1595,42 @@ const styles = StyleSheet.create({
   },
   releaseMeta: {
     color: '#C7C1B7',
+    flexShrink: 1,
     fontFamily: fonts.label,
     fontSize: TV_TYPE.eyebrow,
-    marginTop: 3,
+  },
+  releaseMetaRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 4,
+  },
+  healthBadgeText: {
+    fontFamily: fonts.heading,
+    fontSize: TV_TYPE.eyebrow,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  seasonPackBadgeText: {
+    color: GOLD_ACCENT,
+    fontFamily: fonts.heading,
+    fontSize: TV_TYPE.eyebrow,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  toggleDeadRow: {
+    alignItems: 'flex-start',
+    marginTop: 6,
+  },
+  seasonPackActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
+  },
+  seasonPacksDrawer: {
+    gap: 10,
+    marginBottom: 14,
   },
   smallGoldBtn: {
     alignItems: 'center',

@@ -37,6 +37,9 @@ export async function launchStream({
       if (typeof fileIdx === 'number') {
         streamUrl += `&fileIdx=${fileIdx}`;
       }
+      if (season != null && episode != null) {
+        streamUrl += `&season=${encodeURIComponent(String(season))}&episode=${encodeURIComponent(String(episode))}`;
+      }
     }
 
     toastiva.info('Starting TV stream & resolving English subtitles...');

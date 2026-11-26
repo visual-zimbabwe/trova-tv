@@ -15,6 +15,7 @@ import { MediaArtwork } from './MediaArtwork';
 import { ProgrammeEyebrowLabel } from './ProgrammeSectionHeader';
 import { fetchSeasonEpisodes } from '../lib/tmdb';
 import {
+  isDeadOrArchiveStream,
   searchEpisodeTorrents,
   searchSeasonPackTorrents,
 } from '../lib/torrentSearchEngine';
@@ -62,11 +63,13 @@ export function SeasonDetailSheetContent({
   const [seasonPacks, setSeasonPacks] = useState([]);
   const [seasonPackLoading, setSeasonPackLoading] = useState(false);
   const [showSeasonPackDrawer, setShowSeasonPackDrawer] = useState(false);
+  const [showAllSeasonPacks, setShowAllSeasonPacks] = useState(false);
 
   // Per-episode streaming states: { [episodeNumber]: resultsArray }
   const [episodeSources, setEpisodeSources] = useState({});
   const [loadingEpisodes, setLoadingEpisodes] = useState({});
   const [expandedEpisodeSources, setExpandedEpisodeSources] = useState({});
+  const [showAllEpisodeSources, setShowAllEpisodeSources] = useState({});
   const [expandedOverview, setExpandedOverview] = useState({});
 
   const {
@@ -111,6 +114,7 @@ export function SeasonDetailSheetContent({
       setSeasonPackLoading(true);
       searchSeasonPackTorrents({
         seriesTitle,
+        originalTitle,
         seasonNumber: season.seasonNumber,
         imdbId,
       }).then((packs) => {
@@ -123,9 +127,13 @@ export function SeasonDetailSheetContent({
     return () => {
       cancelled = true;
     };
-  }, [seriesTitle, season?.seasonNumber, imdbId]);
+  }, [seriesTitle, originalTitle, season?.seasonNumber, imdbId]);
 
-  const topSeasonPack = seasonPacks[0] || null;
+  const healthySeasonPacks = seasonPacks.filter((p) => !isDeadOrArchiveStream(p));
+  const hiddenSeasonPackCount = seasonPacks.length - healthySeasonPacks.length;
+  const visibleSeasonPacks =
+    showAllSeasonPacks || !healthySeasonPacks.length ? seasonPacks : healthySeasonPacks;
+  const topSeasonPack = healthySeasonPacks[0] || seasonPacks[0] || null;
   const seasonDownloads = getSeasonDownloads({
     imdbId,
     tmdbId: seriesTmdbId,
@@ -211,6 +219,7 @@ export function SeasonDetailSheetContent({
       setSeasonPackLoading(true);
       searchSeasonPackTorrents({
         seriesTitle,
+        originalTitle,
         seasonNumber: season.seasonNumber,
         imdbId,
       }).then((packs) => {
@@ -221,7 +230,7 @@ export function SeasonDetailSheetContent({
     } else {
       setShowSeasonPackDrawer((prev) => !prev);
     }
-  }, [seasonPacks.length, seasonPackLoading, seriesTitle, season?.seasonNumber, imdbId]);
+  }, [seasonPacks.length, seasonPackLoading, seriesTitle, originalTitle, season?.seasonNumber, imdbId]);
 
   // Fetch and expand sources for an episode
   const handleStreamEpisode = useCallback(
@@ -245,6 +254,7 @@ export function SeasonDetailSheetContent({
       try {
         const sources = await searchEpisodeTorrents({
           seriesTitle,
+          originalTitle,
           seasonNumber: season.seasonNumber,
           episodeNumber: epNum,
           imdbId,
@@ -262,7 +272,7 @@ export function SeasonDetailSheetContent({
         setLoadingEpisodes((prev) => ({ ...prev, [epNum]: false }));
       }
     },
-    [expandedEpisodeSources, episodeSources, seriesTitle, season?.seasonNumber, imdbId],
+    [expandedEpisodeSources, episodeSources, seriesTitle, originalTitle, season?.seasonNumber, imdbId],
   );
 
   if (!season) return null;
@@ -334,7 +344,7 @@ export function SeasonDetailSheetContent({
                 : seasonPackLoading
                 ? 'Searching peer swarms for season pack...'
                 : topSeasonPack
-                ? `${topSeasonPack.attributes?.resolution} · ${topSeasonPack.formattedSize} · ${topSeasonPack.seeders} seeds`
+                ? `${topSeasonPack.health?.badge ? `${topSeasonPack.health.badge} · ` : ''}${topSeasonPack.attributes?.resolution} · ${topSeasonPack.formattedSize} · ${topSeasonPack.scrapeVerified ? '' : '~'}${topSeasonPack.seeders} seeds`
                 : 'Play complete season in one continuous playlist'}
             </Text>
           </View>
@@ -360,7 +370,8 @@ export function SeasonDetailSheetContent({
                 No season pack torrents found for this season.
               </Text>
             ) : (
-              seasonPacks.slice(0, 3).map((pack) => {
+              <>
+                {visibleSeasonPacks.slice(0, showAllSeasonPacks ? 8 : 3).map((pack) => {
                 const packEntries = getSeasonDownloads({
                   infoHash: pack.infoHash,
                   season: season.seasonNumber,
@@ -398,6 +409,16 @@ export function SeasonDetailSheetContent({
                         {pack.name}
                       </Text>
                       <View style={styles.badgeRow}>
+                        {pack.health?.badge && (
+                          <Text
+                            style={[
+                              styles.attrBadge,
+                              { color: pack.health.color || GOLD_ACCENT, ...typography.labelSm },
+                            ]}
+                          >
+                            {pack.health.badge}
+                          </Text>
+                        )}
                         <Text
                           style={[
                             styles.qualityBadge,
@@ -416,16 +437,50 @@ export function SeasonDetailSheetContent({
                             {pack.attributes.codec}
                           </Text>
                         )}
+                        {pack.attributes?.audioBadge && (
+                          <View
+                            style={[
+                              styles.langBadgeWrap,
+                              {
+                                backgroundColor: pack.attributes.audioBadge.isDub
+                                  ? (colors.error || '#CF6679') + '22'
+                                  : GOLD_ACCENT + '20',
+                                borderColor: pack.attributes.audioBadge.isDub
+                                  ? (colors.error || '#CF6679') + '55'
+                                  : GOLD_ACCENT + '55',
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.langBadgeText,
+                                {
+                                  color: pack.attributes.audioBadge.isDub
+                                    ? colors.error || '#CF6679'
+                                    : GOLD_ACCENT,
+                                  ...typography.labelSm,
+                                },
+                              ]}
+                            >
+                              {pack.attributes.audioBadge.text}
+                            </Text>
+                          </View>
+                        )}
                         <Text
                           style={[
                             styles.seedBadge,
                             {
-                              color: pack.seeders >= 50 ? '#4CAF50' : '#E5A93C',
+                              color:
+                                pack.seeders >= 20
+                                  ? '#4CAF50'
+                                  : pack.seeders > 0
+                                  ? '#E5A93C'
+                                  : colors.onSurfaceVariant,
                               ...typography.labelSm,
                             },
                           ]}
                         >
-                          {pack.seeders} seeds
+                          {pack.scrapeVerified ? `${pack.seeders} seeds` : `~${pack.seeders} seeds`}
                         </Text>
                         <Text
                           style={[
@@ -595,7 +650,29 @@ export function SeasonDetailSheetContent({
                     </View>
                   </View>
                 );
-              })
+              })}
+                {hiddenSeasonPackCount > 0 && healthySeasonPacks.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.streamSecondaryBtn}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setShowAllSeasonPacks((prev) => !prev);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.streamSecondaryText,
+                        { color: colors.onSurfaceVariant, ...typography.labelSm },
+                      ]}
+                    >
+                      {showAllSeasonPacks
+                        ? 'Hide dead / low-seed packs'
+                        : `Show ${hiddenSeasonPackCount} dead / low-seed pack${hiddenSeasonPackCount === 1 ? '' : 's'}`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </>
             )}
           </View>
         )}
@@ -894,7 +971,14 @@ export function SeasonDetailSheetContent({
                 </View>
 
                 {/* Expanded Stream Sources Drawer */}
-                {isExpanded && (
+                {isExpanded && (() => {
+                  const healthyEpSources = sources.filter((s) => !isDeadOrArchiveStream(s));
+                  const hiddenEpCount = sources.length - healthyEpSources.length;
+                  const showAllForEp = Boolean(showAllEpisodeSources[epNum]);
+                  const visibleEpSources =
+                    showAllForEp || !healthyEpSources.length ? sources : healthyEpSources;
+
+                  return (
                   <View style={styles.episodeSourcesDrawer}>
                     {!sources.length ? (
                       <Text
@@ -906,7 +990,8 @@ export function SeasonDetailSheetContent({
                         No active sources found for this episode.
                       </Text>
                     ) : (
-                      sources.slice(0, 4).map((source) => {
+                      <>
+                        {visibleEpSources.slice(0, showAllForEp ? 10 : 5).map((source) => {
                         const srcDownload = getForMedia({
                           infoHash: source.infoHash,
                           season: season.seasonNumber,
@@ -930,6 +1015,26 @@ export function SeasonDetailSheetContent({
                                 {source.name}
                               </Text>
                               <View style={styles.badgeRow}>
+                                {source.health?.badge && (
+                                  <Text
+                                    style={[
+                                      styles.attrBadge,
+                                      { color: source.health.color || GOLD_ACCENT, ...typography.labelSm },
+                                    ]}
+                                  >
+                                    {source.health.badge}
+                                  </Text>
+                                )}
+                                {source.isSeasonPackFallback && (
+                                  <Text
+                                    style={[
+                                      styles.attrBadge,
+                                      { color: GOLD_ACCENT, ...typography.labelSm },
+                                    ]}
+                                  >
+                                    Season Pack
+                                  </Text>
+                                )}
                                 <Text
                                   style={[
                                     styles.qualityBadge,
@@ -948,16 +1053,52 @@ export function SeasonDetailSheetContent({
                                     {source.attributes.codec}
                                   </Text>
                                 )}
+                                {source.attributes?.audioBadge && (
+                                  <View
+                                    style={[
+                                      styles.langBadgeWrap,
+                                      {
+                                        backgroundColor: source.attributes.audioBadge.isDub
+                                          ? (colors.error || '#CF6679') + '22'
+                                          : GOLD_ACCENT + '20',
+                                        borderColor: source.attributes.audioBadge.isDub
+                                          ? (colors.error || '#CF6679') + '55'
+                                          : GOLD_ACCENT + '55',
+                                      },
+                                    ]}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.langBadgeText,
+                                        {
+                                          color: source.attributes.audioBadge.isDub
+                                            ? colors.error || '#CF6679'
+                                            : GOLD_ACCENT,
+                                          ...typography.labelSm,
+                                        },
+                                      ]}
+                                    >
+                                      {source.attributes.audioBadge.text}
+                                    </Text>
+                                  </View>
+                                )}
                                 <Text
                                   style={[
                                     styles.seedBadge,
                                     {
-                                      color: source.seeders >= 50 ? '#4CAF50' : '#E5A93C',
+                                      color:
+                                        source.seeders >= 20
+                                          ? '#4CAF50'
+                                          : source.seeders > 0
+                                          ? '#E5A93C'
+                                          : colors.onSurfaceVariant,
                                       ...typography.labelSm,
                                     },
                                   ]}
                                 >
-                                  {source.seeders} seeds
+                                  {source.scrapeVerified
+                                    ? `${source.seeders} seeds`
+                                    : `~${source.seeders} seeds`}
                                 </Text>
                                 <Text
                                   style={[
@@ -1112,10 +1253,36 @@ export function SeasonDetailSheetContent({
                             </View>
                           </View>
                         );
-                      })
+                      })}
+                        {hiddenEpCount > 0 && healthyEpSources.length > 0 && (
+                          <TouchableOpacity
+                            style={styles.streamSecondaryBtn}
+                            onPress={() => {
+                              Haptics.selectionAsync();
+                              setShowAllEpisodeSources((prev) => ({
+                                ...prev,
+                                [epNum]: !prev[epNum],
+                              }));
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text
+                              style={[
+                                styles.streamSecondaryText,
+                                { color: colors.onSurfaceVariant, ...typography.labelSm },
+                              ]}
+                            >
+                              {showAllForEp
+                                ? 'Hide dead / low-seed sources'
+                                : `Show ${hiddenEpCount} dead / low-seed source${hiddenEpCount === 1 ? '' : 's'}`}
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </>
                     )}
                   </View>
-                )}
+                  );
+                })()}
               </View>
             );
           })
@@ -1342,6 +1509,17 @@ const styles = StyleSheet.create({
   },
   qualityBadge: {
     fontWeight: '800',
+  },
+  langBadgeWrap: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  langBadgeText: {
+    fontWeight: '700',
   },
   attrBadge: {
     fontWeight: '600',
